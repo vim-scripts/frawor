@@ -1,0 +1,1108 @@
+*translit3.txt*     Plugin used for text transliteration
+=============================================================================
+CONTENTS                                                       *tr3-contents*
+
+    1. Intro                                           |tr3-intro|
+    2. Functionality provided                          |tr3-functionality|
+        2.1. Commands                                  |tr3-commands|
+        2.2. Functions                                 |tr3-functions|
+        2.3. Mappings                                  |tr3-mappings|
+    3. Options                                         |tr3-options|
+    4. String transliteration                          |tr3-trs|
+        4.1. Plugins for string transliteration        |tr3-trs-plugins|
+    5. Input transliteration                           |tr3-tof|
+        5.1. Plugins for input transliteration         |tr3-tof-plugins|
+    6. Transliteration table                           |tr3-transsymb|
+        6.1. Sources of transliteration table          |tr3-transsymb-arg|
+        6.2. Internal transliteration table format     |tr3-transsymb-int|
+        6.3. Default transliteration table             |tr3-transsymb-def|
+
+=============================================================================
+1. Intro                                                          *tr3-intro*
+
+This plugin provides the ability to transform one sequence of symbols into 
+another. The typical use case is transliteration of latin symbols into russian 
+symbols for systems without russian keyboard.
+
+Features:
+    ∙ transliteration of text, provided as function argument;
+    ∙ transliteration of a selection or a line range;
+    ∙ input transliteration;
+    ∙ setting up the input transliteration in current buffer or in all opened
+      buffers;
+    ∙ plugin system for transliteration function;
+    ∙ plugin system for input transliteration;
+    ∙ loading transliteration table from a file, a variable, a dictionary or
+      a function;
+    ∙ displaying the transliteration table on the screen.
+
+This plugin requires chk, json, stuf and load plugins.
+
+=============================================================================
+2. Functionality provided                                 *tr3-functionality*
+
+This plugin provides one command and a number of functions. Both command and 
+function names start with Tr3, but this prefix can be altered (see 
+|load-opt-_fprefix| and |load-opt-_cprefix|). Plugin itself does not use 
+neither this commands, nor this functions, so you can safely modify the 
+prefix. Possible values of {transsymb} argument you can see in 
+|tr3-transsymb-arg|. Note that in the command line you can use only string 
+values.
+
+-----------------------------------------------------------------------------
+2.1. Commands                                                  *tr3-commands*
+                                                                *tr3-actions*
+
+:Tr3Command[!] {action} …                        *tr3-:Command* *:Tr3Command*
+                The only command provided by this plugin. If variable 
+                |g:tr3Options| exists and has key _cprefix (see 
+                |load-opt-_cprefix|), then prefix Tr3 is altered.
+                Possible actions:
+                                                   *tr3-action-transliterate*
+:[range]Tr3Command transliterate {target} [using {transsymb}]
+                Depending on {target} transliterate either selection 
+                ({target}==selection), or lines range ({target}==lines) 
+                (default is current line).
+:Tr3Command[!] tof start [{transsymb}]                 *tr3-action-tof-start*
+                Set up the input transliteration mode for the current buffer. 
+                If bang is given set up the input transliteration for all 
+                buffers.
+:Tr3Command[!] tof stop                                 *tr3-action-tof-stop*
+                Cancel the input transliteration mode for the current buffer. 
+                If bang is given cancel the input transliteration for all 
+                buffers.
+:Tr3Command tof restart                              *tr3-action-tof-restart*
+                Cancel the input transliteration mode for the current buffer 
+                and set it up again.
+                                                           *tr3-action-print*
+:Tr3Command print [transsymb {transsymb}] [columns {columns}]
+                Display the transliteration table in {columns} columns 
+                (default: -2 – screen width).
+:Tr3Command[!] add {srcstr} {trstr} [to {transsymb}]         *tr3-action-add*
+                Add string {srcstr} that must be transliterated as {trstr} to 
+                transliteration table and save the result (see 
+                |tr3-action-save|). If bang is not present this command fails 
+                if {srcstr} already exists.
+:Tr3Command[!] del[ete] {srcstr} [from {transsymb}]          *tr3-action-del*
+                Delete string {srcstr} from transliteration table and save the 
+                result (see |tr3-action-save|). If bang is given then delete 
+                all transliteration sequences starting with {srcstr}.
+                                                       *tr3-action-setoption*
+:Tr3Command[!] setoption {option} {value} for {srcstr} [in {transsymb}]
+                Set option {option} to value {value} for string {srcstr} in 
+                transliteration table and save the result (see 
+                |tr3-action-save|). Option list is given in 
+                |tr3-transsymb-options|. Banged version is able to rewrite the 
+                existing option.
+                                                       *tr3-action-deloption*
+:Tr3Command deloption {option} for {srcstr} [in {transsymb}]
+                Delete option {option} for string {srcstr} in transliteration 
+                table and save the result (see |tr3-action-save|). Option list 
+                is given in |tr3-transsymb-options|.
+:Tr3Command save [{transsymb}]                              *tr3-action-save*
+                Save the transliteration table. Depending on table source (see 
+                |tr3-transsymb-arg|) following actions may occur:
+                Source      Action ~
+                File        Dumping transliteration table to JSON file.
+                            See |json-function-dump|.
+                Variable    Executing “let varname=transsymb”.
+                Function    Calling function with the only argument — altered
+                            dictionary. Calling is done via function |call()| 
+                            with three arguments: source function, list of one 
+                            element — altered dictionary — and empty 
+                            dictionary.
+                Dictionary  Do nothing.
+:Tr3Command cache purge {target}                     *tr3-action-cache-purge*
+                Delte {target} cache:
+                {target} value  Cache removed ~
+                trans           All transliteration table transformations.
+                printtrans      Transformations for displaying tables.
+                toftrans        Transformations for input transliteration.
+:Tr3Command cache show                               *tr3-action-cache-show*
+                Display cache.
+
+-----------------------------------------------------------------------------
+2.2. Functions                                                 *tr3-functions*
+
+Like with command, Tr3 function prefix can be altered in g:tr3Options._fprefix 
+option (see |load-opt-_fprefix|). For possible {transsymb} values see 
+|tr3-transsymb-arg|. All arguments ending with str must have |String| type. 
+Arguments {replace} and {recurse} must be equal to either 1 or 0.
+
+                                                 *tr3-function-transliterate*
+Tr3transliterate({str}[, {transsymb}])                   *Tr3transliterate()*
+                Transliterate text {str}.
+                                                           *tr3-function-add*
+Tr3add({srcstr}, {trstr}[, {replace}[, {transsymb}]])             *Tr3add()*
+                Add string {srcstr} that must be transliterated as {trstr} to 
+                transliteration table and save the result (see 
+                |tr3-action-save|). If {replace} is 1 rewrite existing string.
+                                                           *tr3-function-del*
+Tr3del({srcstr}[, {recurse}[, {transsymb}]])                      *Tr3del()*
+                Delete string {srcstr} from transliteration table and save the 
+                result (see |tr3-action-save|). If {recurse} is 1 delete all 
+                strings beginning with {srcstr}.
+                                                     *tr3-function-setoption*
+                                                             *Tr3setoption()*
+Tr3setoption({optstr}, {valuestr}, {srcstr}[, {replace}[, {transsymb}]])
+                Set option {option} to value {value} for string {srcstr} in 
+                transliteration table and save the result (see 
+                |tr3-action-save|). Option list is given in 
+                |tr3-transsymb-options|. {replace}==1 allows to rewrite 
+                existing option.
+                                                     *tr3-function-deloption*
+Tr3deloption({optstr}, {srcstr}[, {transsymb}])              *Tr3deloption()*
+                Delete option {option} for string {srcstr} in transliteration 
+                table and save the result (see |tr3-action-save|). Option list 
+                is given in |tr3-transsymb-options|.
+                                                         *tr3-function-print*
+Tr3print([{columns}[, {transsymb}]])                            *Tr3print()*
+                Depending on {columns} returns:
+                {columns}  Returned value ~
+                   -1      List of lists each containing three elements:
+                            ∙ string to transliterate
+                            ∙ result of transliteration of this string
+                            ∙ flags
+                           This is the default.
+                    0      List of strings, containing data from previous case 
+                           aligned in columns.
+                   -2      String, containing transliteration table formatted
+                           for displaying in the current window.
+                   >0      String, containing transliteration table formatted
+                           for displaying in {columns} columns.
+                Flags (the third column):
+                Flag  Meaning ~
+                 c    For this string option “capital=none” is working.
+                      See |tr3-transsymb-options|.
+                 f    For this string option “capital=first” is working.
+                      See |tr3-transsymb-options|.
+                 d    First symbol of transliterated string is combining
+                      diacritics symbol, so letter “a” was inserted before the 
+                      first symbol.
+
+-----------------------------------------------------------------------------
+2.3. Mappings                                                 *tr3-mappings*
+
+                                               *tr3-<_leader>* *tr3-_leader*
+                                     *tr3-option-_leader* *tr3-option-_maps*
+This plugin provides the following mappings (see |load-opt-_maps| and 
+|load-opt-_leader| for information about how to change default keys and 
+<_leader> (default: “\t”) respectively):
+
+Mapping name    (Mode(s)), default keys and description ~
+CmdTransliterate (c)                          *tr3-mapping-CmdTransliterate*
+                Default: <_leader>. Shows input prompt, transliterates the 
+                input and pastes transliteration result. Unlike 
+                |tr3-mapping-Transliterate| this mapping is defined for 
+                command mode.
+Transliterate   (i)                              *tr3-mapping-Transliterate*
+                Default: <_leader>. Shows input prompt, transliterates the 
+                input and pastes transliteration result. This and all 
+                consequent mappings are defined for insert mode.
+TransliterateWord (i)                        *tr3-mapping-TransliterateWord*
+                Default: <_leader>w. Transliterates the word under cursor.
+TransliterateWORD (i)                        *tr3-mapping-TransliterateWORD*
+                Default: <_leader>W. Transliterates the WORD under cursor.
+StartToF        (n)                                   *tr3-mapping-StartToF*
+                Default: <_leader>s. Starts input transliteration mode.
+StopToF         (n)                                    *tr3-mapping-StopToF*
+                Default: <_leader>S. Stops input transliteration mode.
+TranslitReplace (nx)                           *tr3-mapping-TranslitReplace*
+                Default: <_leader>r. Same as |r|, but transliterates its 
+                argument (so, “\tr<=>” typed fast enough will replace the 
+                symbol under the cursor with “⇔”). Note that this mapping 
+                respects 'timeout' and 'timeoutlen' options.
+                The following mappings work like TranslitReplace:
+TranslitNext    (nxo)                               *tr3-mapping-TranslitNext*
+TranslitPrev    (nxo)                               *tr3-mapping-TranslitPrev*
+TranslitToNext  (nxo)                             *tr3-mapping-TranslitToNext*
+TranslitToPrev  (nxo)                             *tr3-mapping-TranslitToPrev*
+                Default: <_leader>f, <_leader>F, <_leader>t and <_leader>T. 
+                This mappings are replacements for |f|, |F|, |t| and |T|.
+TransliterateMotion (nx)                     *tr3-mapping-TransliterateMotion*
+                Default: <_leader>v. Transliterates selection or given text 
+                object (|text-objects|).
+
+=============================================================================
+3. Options                                                      *tr3-options*
+                                                *b:tr3Options* *g:tr3Options*
+
+This plugin uses dictionaries b:tr3Options, g:tr3Options, and some internal 
+dictionary for buffer, global and default options storage respectively. 
+Dictionaries are listed according to their priority. If option is found but it 
+contains errors an exception is throwed. Possible keys:
+
+Key           Description ~
+                                                          *tr3-option-BrkSeq*
+BrkSeq        A string; sequence which breaks transliteration.
+              Is used by plugins |tr3-trs-plug-brk| and |tr3-tof-plug-brk|.
+              Setting this option to empty string effectively disables these 
+              plugins.
+              Default value: '@'.
+                                                          *tr3-option-EscSeq*
+EscSeq        A string; sequence that escapes next symbol.
+              Is used by plugins |tr3-trs-plug-esc| and 
+              |tr3-trs-plug-notrans|.
+              Setting this option to empty string effectively disables 
+              escaping.
+              Default value: '\'.
+                                                     *tr3-option-StopTrSymbs*
+StopTrSymbs   Dictionary with string values. Keys of this dictionary are used
+              as sequences that pause transliteration: after one of this 
+              sequence occurs it stops transliteration and is replaced by 
+              respective value.
+              Is used by plugins |tr3-trs-plug-notrans| and 
+              |tr3-tof-plug-notrans|.
+              Setting this option to an empty dictionary effectively disables 
+              these plugins.
+              Default value: {'%': ''}
+                                                    *tr3-option-StartTrSymbs*
+StartTrSymbs  Dictionary with string values. Keys of this dictionary are used
+              as sequences that start paused transliteration: if one of this 
+              keys occurs after |tr3-option-StopTrSymbs| it starts 
+              transliteration and is replaced by respective value.
+              Is used by plugins |tr3-trs-plug-notrans|and 
+              |tr3-tof-plug-notrans|.
+              Default value: {'%': ''}
+                                                     *tr3-option-NoTransWord*
+NoTransWord   Dictionary with string values. Keys of this dictionary are used
+              to escape the next WORD: after one of keys occurs it escapes the 
+              next WORD and is replaced by respective value.
+              Is used by plugin |tr3-trs-plug-notransword|.
+              Setting this option to an empty dictionary effectively disables 
+              this plugin.
+              Default value: {'%%': ''}
+DefaultTranssymb                                *tr3-option-DefaultTranssymb*
+              Default transliteration table. See |tr3-transsymb-arg|.
+              Default value: transsymb
+ConfigDir                                              *tr3-option-ConfigDir*
+              Directory where main transliteration tables are located. 
+              See |tr3-transsymb-arg|. Default value:
+                                   {plugin-install-dir}/config/translit3
+                                                           *tr3-option-Plugs*
+Plugs         String transliteration plugins. See |tr3-trs-option-Plugs|.
+              Default value: {"Before": ["brk"],
+                               "After": ["esc", "notransword", "notrans"]}
+                                                        *tr3-option-ToFPlugs*
+ToFPlugs      Plugins for input transliteration.
+              See |tr3-tof-option-ToFPlugs|.
+              Default value: ["notrans", "brk"]
+                                                       *tr3-option-WriteFunc*
+WriteFunc     Name of the function that will be used to write characters in 
+              input transliteration mode. Normally |tr3-action-tof-start| 
+              defines an expr mappings, something like that: >
+                  inoremap <expr> <buffer> {c} {str}
+<             where {c} is a character that can be transliterated and {str} is 
+              an expression that returns result of transliteration. If this 
+              option is set and is not null, then it will produce >
+                  inoremap <buffer> {c} <C-\><C-o>:call call({WF}, [{str}], {})
+<             where {WF} is a write function name. Note that function may get 
+              a dictionary which describes a mapping like described in 
+              |tr3-tof-bufdict-exmaps| which must be used instead of {str}.
+              Instead of specifing existing function, you may use one of 
+              predefined functions. Here is the list with their 
+              descriptions:
+              WriteFunc   Description ~
+              @conque     This function adds support for Conque Shell plugin. 
+                          You should use it only in conque terminals.
+                                                       *tr3-option-BreakFunc*
+BreakFunc     Reference to a function that determines whether transliteration 
+              sequence was broken. Default value (0) makes plugin use built-in 
+              function which breaks transliteration sequence if cursor has 
+              moved at least one line up or two lines down since last input or 
+              if current line end does not match last transliteration result. 
+              Function must take a buffer dictionary (which is described in 
+              |tr3-tof-bufdict|) and a character and return 0 or 1.
+                                                       *tr3-option-DoNotLoad*
+DoNotLoad     If this key is found in dictionary g:tr3Options and this plugin
+              is not loaded yet then plugin loading is prevented.
+              Default value: not present.
+
+=============================================================================
+4. String transliteration                                           *tr3-trs*
+
+String transliteration is used by function |Tr3transliterate()| and action 
+|tr3-action-transliterate| of command |:Tr3Command|.
+
+-----------------------------------------------------------------------------
+4.1. Plugins for string transliteration                     *tr3-trs-plugins*
+
+Process of string transliteration:
+1. It is checked whether beginning of the string matches one of the regular 
+   expressions specified in Plug.Before. If the string matched the respective 
+   plugin is run. Transliteration may stop at this point.
+2. It is checked whether current symbol matches one of the keys of 
+   transliteration table. If so transliteration continues recursively.
+3. It is checked whether current transliteration table has key “none”. If so 
+   respective value is returned.
+4. If transliteration function is run in the first level of recursion plugins 
+   from Plug.After are run (if the string matches respective regular 
+   expression).
+5. After successful transliteration of part of the string transliteration 
+   function is run again for the remaining part.
+
+4.1.1. Plugs option                                   *tr3-trs-option-Plugs*
+Plugs option is a dictionary with keys Before and After (either may be 
+omitted). Respective values for both keys are lists containing either names of 
+built-in plugins, or list where first value is a regular expression which 
+should be matched by the beginning of transliterated string in order to run 
+a function referenced in the second value.
+
+4.1.2. Plugin function                                   *tr3-trs-plug-func*
+Plugin function must have 5 arguments:
+Argument     Value ~
+{match}      Part of string which matches regular expression.
+{tail}       Part of string after {match}.
+{transsymb}  Transliteration table. See |tr3-transsymb-int|.
+{cache}      Dictionary. Dictionary keys:
+             1. BrkSeq, EscSeq, StopTrSymbs, StartTrSymbs — dictionaries with 
+                two keys: “value” and “regex”. Key “value” has value of 
+                respective option, key “regex” has regular expression for 
+                built-in plugins.
+             2. Plugs — dictionary with keys “Before” and “After”, each has 
+                list of two element lists.
+{flags}      Dictionary with keys “upper”, “fstupper” and “transbeg”.
+             Flag      Value ~
+             transbeg  0 or 1. This flag is 1 if transliteration function is
+                       transliterating first symbol of some sequence.
+             upper     1, 0, -1, -2:
+                       Value  Meaning ~
+                         1    Transliteration result should be translated to 
+                              upper case.
+                         0    First symbol of sequence is in lower case.
+                        -1    No symbols with case occured yet.
+                        -2    During transliteration option “capital”=“none”
+                              occured. See |tr3-transsymb-options|.
+             fstupper  1 or 0. 1 means that option “capital”=“first” occured
+                       during transliteration.
+Dictionaries {transsymb}, {cache} and {flags} must not be changed.
+Plugin function should return dictionary with the following keys:
+Key     Value ~
+status  String, possible values: “success”, “failure” and “pass”. If its
+        value is either “success” or “pass”, then all other keys must be 
+        present. Status “success” prevents other plugins from being run and 
+        “pass” means “prepend the result and continue”. Status “failure” means 
+        “ignore the result and continue”.
+delta   Any integer that is less than byte count of {tail} part and greater or 
+        equal then -len({match}). Status “success” means that {match} and part 
+        of {tail} with length delta are considered to be successfully 
+        transliterated, negative values mean that part of {match} is 
+        considered to be not transliterated. Note that if delta=-len({match}), 
+        then transliteration function may never end.
+result  Any string. This value will be appended to the transliteration
+        result.
+flags   Dictionary with flags. For the description see {flags} argument. All
+        flags must be present.
+
+4.1.3. Plugins for string transliteration           *tr3-trs-builtin-plugins*
+esc                                                        *tr3-trs-plug-esc*
+        Escapes symbol after |tr3-option-EscSeq| sequence.
+        Examples: >
+           EscSeq: '\'
+
+           “\\” → “\”
+
+notransword                                        *tr3-trs-plug-notransword*
+        Escapes a string between any key from |tr3-option-NoTransWord| and the 
+        nearest blank symbol. Key from |tr3-option-NoTransWord| is replaced by 
+        corresponding value.
+        Examples: >
+           NoTransWord: {"%%": "",
+                         '\': '\'}
+
+           “ab%%cde fgh” → “абcde фгх”
+             “\bf tekst” → “\bf текст”
+
+notrans                                                *tr3-trs-plug-notrans*
+        Prevents everything between any key from |tr3-option-StopTrSymbs| and 
+        any key from |tr3-option-StartTrSymbs| (or the end of string). Both 
+        keys are replaced with corresponding values. Escaping also works.
+        Examples: >
+           StopTrSymbs: {'%': "",
+                         '<': '<'},
+           StartTrSymbs:{'%': "",
+                         '>': '>'}
+           EscSeq: '\'
+
+              “ab%cde%fg” → “абcdeфг”
+             “ab%cde\%fg” → “абcde%fg”
+           “<i>tekst</i>” → “<i>текст</i>”
+
+brk                                                        *tr3-trs-plug-brk*
+        Replaces |tr3-option-BrkSeq| with an empty string. Useful for breaking 
+        transliteration sequences.
+        Examples: >
+           BrkSeq: '@'
+
+            “sh” → “ш”
+           “s@h” → “сх”
+           “@@@” → “”
+
+=============================================================================
+5. Input transliteration                                           *tr3-tof*
+
+To setup the input transliteration mode see |tr3-action-tof|. This action does 
+the following:
+1. Creates a dictionary which is unique for the current buffer.
+2. Creates a list of all symbols that are used in all transliteration 
+   sequences.
+3. Adds symbols from options |tr3-option-BrkSeq|, |tr3-option-StopTrSymbs| 
+   и |tr3-option-StartTrSymbs| to this list.
+4. This list is used to create an insert mode mappings. If an insert mode 
+   mapping already exists for some symbol then its values is saved for 
+   restoring after input transliteration mode is canceled (Note that mapping 
+   is recreated using <buffer> and <special> modifiers).
+
+-----------------------------------------------------------------------------
+5.1. Input transliteration plugins                         *tr3-tof-plugins*
+
+When you press a key or a sequence of keys which is mapped to the plugin 
+function:
+1. A plugin function is called with two arguments: dictionary, associated with 
+   the current buffer and your input.
+2. It is tested whether some plugin is active. If it is then this plugin is 
+   called.
+3. It is tested whether your input is associated with some plugin. This test 
+   is run only if your input is not a continuation of some transliteration 
+   sequence. If test succeeds a corresponding plugin is run.
+4. If all plugins returned “failure” or “pass” status your input is 
+   transliterated. If you are inside some transliteration sequence (for 
+   example “|p” → “π” and you already typed “|”), then a sequence of <BS> is 
+   added to the result in order to delete the previous result. (In the 
+   example: “|” is not transliterated and returns “|”, then “p” is 
+   successfully transliterated and the result is “<BS>π”).
+
+5.1.1. ToFPlugs option                             *tr3-tof-option-ToFPlugs*
+Format of ToFPlugs option is similar to the Plugs option: it is a list of list 
+or strings, where each string must be an existing plugin’s name and each list 
+must be a pair of a function reference and a list of Strings or a valid 
+regular expression. If second value is a list of Strings all strings are added 
+to the mapping list and you must enter one of these strings to run the plugin. 
+If second value is a regular expression, than your input must match it to run 
+the plugin. In this case nothing is added to the mapping list.
+
+5.1.2. Function requirements                             *tr3-tof-plug-func*
+Plugin function must take exactly two arguments: buffer dictionary and string 
+typed by user.
+Buffer dictionary:                                         *tr3-tof-bufdict*
+Key           Value ~
+                                                  *tr3-tof-bufdict-transsymb*
+transsymb     Transliteration table. See |tr3-transsymb-int| for details.
+                                                   *tr3-tof-bufdict-curtrans*
+curtrans      List of transliteration tables. In most cases it will be
+              a list of one element: bufdict.transsymb.
+                                                   *tr3-tof-bufdict-curtrseq*
+curtrseq      Last transliteration result. It is used for creating a
+              sequence of <BS>.
+                                                      *tr3-tof-bufdict-flags*
+flags         Flags. Flag list is similar to {flags} argument of
+              |tr3-trs-plug-func|, but without “transbeg” flag. Instead of 
+              using “transbeg”, check for bufdict.curtrans length.
+                                                   *tr3-tof-bufdict-lastline*
+lastline      Last line number. Used to determine whether user moved cursor
+              to another location. May be equal to -2.
+                                                      *tr3-tof-bufdict-bufnr*
+bufnr         Number of the buffer current dictionary is connected to. Do
+              not edit.
+                                                     *tr3-tof-bufdict-exmaps*
+exmaps        Dictionary, where keys are {lhs} of mappings defined by 
+              current input transliteration session and values are 
+              dictionaries with the following keys (see |maparg()| if you have 
+              Vim 7.3.32 or higher):
+              Key      Description ~
+              lhs      The {lhs} of the mapping.
+              rhs      The {rhs} of the mapping.
+              silent   1 for a |:map-silent|, 0 otherwise. Always equal to 
+                       0 for vim versions older then 7.3.32.
+              noremap  1 if {rhs} is not remappable, 0 otherwise.
+              expr     1 for an expression mapping (|:map-<expr>|). Always 
+                       equal to 0 for vim versions older then 7.3.32.
+              buffer   1 for a buffer local mapping (|:map-local|). Always 
+                       equal to 2 for vim versions older then 7.3.32.
+              mode     Modes for which mapping is defined. Always equal to "i".
+              sid      The script local ID. Always equal to 0 for vim versions 
+                       older then 7.3.32 (but here <SID> will be expanded by 
+                       |maparg()|).
+                                                       *tr3-tof-bufdict-vars*
+vars          Variables created by plugins. Is emptied when transliteration
+              fails. Do not change other plugins’ variables.
+                                                      *tr3-tof-bufdict-plugs*
+plugs         Plugin list (normalized list where all plugin names were 
+              replaced with function references). Do not edit.
+                                                *tr3-tof-bufdict-originplugs*
+originplugs   Plugin list (effective value of |tr3-option-ToFPlugs|).
+              Do not edit.
+                                                   *tr3-tof-bufdict-curplugs*
+curplugs      Current plugins list. You should avoid changing it.
+                                                  *tr3-tof-bufdict-testbreak*
+testbreak     Reference to |tr3-option-BreakFunc| function. You should avoid 
+              changing it.
+                                                      *tr3-tof-bufdict-chars*
+chars         List of symbols which invoke transliteration function. Do not
+              edit.
+
+Function must return dictionary with keys “status” and, optionally, 
+“result”.
+Possible “status” values:
+Value     Description ~
+started   Plugin successfully started. Plugin number is added to the
+          bufdict.curplugs list then.
+stopped   Plugin successfuly stopped. Plugin number is then removed from
+          bufdict.curplugs.
+success   Plugin successfully transliterated user input.
+failure   Plugin failed, ignore result.
+pass      Prepend plugin result to the transliteration function result and
+          continue. Note that if len(bufdict.curtrans)>1 then your plugin 
+          could be invoked twice for the same user input. In this case first 
+          result is ignored.
+
+If plugin returns “started”, “stopped” or “success” status and no result empty 
+string is taken as a result.
+
+5.1.3. Input transliteration plugins               *tr3-tof-builtin-plugins*
+notrans                                                *tr3-tof-plug-notrans*
+        Breaks transliteration similarly to |tr3-trs-plug-notrans|: any key 
+        from |tr3-option-StopTrSymbs| breaks transliteration and is replaced 
+        by corresponding value. Any key from |tr3-option-StartTrSymbs| 
+        continues transliteration and is also replaced by corresponding value.
+notransword                                       *tr3-tof-plug-notransword*
+        Breaks transliteration when one of the keys from 
+        |tr3-option-NoTransWord| is typed. Transliteration is continued when 
+        you type space or <CR> (enter).
+brk                                                        *tr3-tof-plug-brk*
+        Breaks current transliteration sequence when |tr3-option-BrkSeq| is 
+        typed, but only if it is not a part of this sequence.
+comm                                                     *tr3-tof-plug-comm*
+        If this plugin is first plugin in the plugins list then input 
+        transliteration is only active if you are typing inside a comment. 
+        Being inside a comment means that syntax group name of at least one 
+        item in |synstack()| contains string `comment' (case is ignored).
+
+=============================================================================
+6. Transliteration table                                      *tr3-transsymb*
+
+Transliteration table is a dictionary with the following keys:
+1. A number of single character keys. Corresponding values are either strings 
+   with the transliteration result or transliteration tables.
+2. Key “none”. Must not be present in the root transliteration table. 
+   Corresponding value contains the transliteration result for the current 
+   sequence.
+                                                      *tr3-transsymb-options*
+3. Key “options”. Corresponding value must contain a dictionary with pair 
+   “capital”: (“none” or “first”). Value “none” means that current sequence 
+   does not have an uppercase analogue. Value “first” means that only first 
+   symbol will be turned to upper case.
+Examples: >
+    transsymb: {'h': 'х',
+               \'c': {"none": 'ц', 'h': 'ч'},
+               \'x': {"none": 'ь', "options": {"capital": "none"}},
+               \'|': {"options": {"capital": "first"}, 't': "\theta"}}
+
+    “h ch Ch CH cH” → “х ч Ч Ч цХ”
+              “x X” → “ь X”
+            “|t |T” → “\theta \Theta”
+
+-----------------------------------------------------------------------------
+6.1. Sources of transliteration table                    *tr3-transsymb-arg*
+
+Function arguments, commands and option |tr3-option-DefaultTranssymb| let you 
+specify the transliteration table in one of the following ways:
+1. A variable name. Must start with “g:” or “b:” and a latin letter and 
+   contain latin letters, digits and dots.
+2. A filename. File must contain JSON-encoded transliteration table 
+   (see |json-function-load|). Filename must either start with a dot, contain 
+   forward or back slash or end with .json.
+3. A name of a file in directory |tr3-option-ConfigDir| without extension 
+   (extension .json is appended automatically). File must contain JSON-encoded 
+   transliteration table and have .json extension. Filename must not contain 
+   forward or back slashes, start with a dot or a letter and a colon or end 
+   with .json.json.
+4. A dictionary. See |tr3-transsymb| for the format of the dictionary.
+5. Function that returns a valid transliteration table (see |tr3-transsymb|) 
+   when called without arguments and saves modified transliteration table when 
+   called with a single argument – this transliteration table.
+
+-----------------------------------------------------------------------------
+6.2. Internal transliteration table format               *tr3-transsymb-int*
+
+Internal transliteration table is also a dictionary with the following keys:
+1. A number of single lowercase characters. Corresponding values are pairs of 
+   transliteration tables for lower and upper cases. Both tables can be 
+   replaced by numbers: first transliteration table replaced by zero means 
+   that lowercase symbol is not transliterated. Upper transliteration table 
+   can be replaced by 0, 1 or 2. 0 and 2 introduce “none” and “first” values 
+   of the “capital” option. 1 means that no upper transliteration table was 
+   specified.
+2. Key “none”. Corresponding value contains transliteration result. Not 
+   present in root transliteration table.
+3. Key “origin”. Corresponding value contains original transliteration table. 
+   Only present in root transliteration table.
+4. Key “source”. Corresponding value contains information about the source of 
+   origin transliteration table. Contains a pair of a string and some value:
+   String  Value ~
+   var     Name of variable with origin transliteration table.
+   file    Name of a file with origin transliteration table.
+   dict    Origin transliteration table.
+   func    Reference to function that returned the origin transliteration
+           table.
+
+   Only present in root transliteration table. See |tr3-transsymb-arg| for 
+   details.
+
+-----------------------------------------------------------------------------
+6.3. Default transliteration table                        *tr3-transsymb-def*
+
+With plugin there comes two transliteration tables: transsymb-ru.json and 
+transsymb-ru:latex.json. Both tables are located in 
+$HOME/.vim/config/translit3 (default). First table is used to transliterate 
+latin to russian symbols + Unicode, second – latin ↔ russian symbols + LaTeX 
+commands.
+
+In order to use :latex transliteration table install following packages: 
+textcomp, txfonts, amssymb, amsmath, bbm, stmaryrd, mathabx и euscript and 
+mathrsfs. Requirements for the particular symbol are listed in form: 
+(latex[/mode][:package[[package preferencies]]])
+
+Russian alphabet:
+         а (a)          a                       р (er)           r
+         б (be)         b                       с (es)           s
+         в (ve)         v                       т (te)           t
+         г (ghe)        g                       у (u)            u
+         д (de)         d                       ф (ef)           f
+         е (ie)         e                       х (ha)           h
+         ё (io)         ox,o',e"                ц (tse)          c
+         ж (zhe)        zh                      ч (che)          ch,c',cx
+         з (ze)         z                       ш (sha)          sh,w
+         и (i)          i                       щ (scsha)        wh,wx,w'
+         й (short i)    j,                      ъ (hard sign)    xx,x',"
+         к (ka)         k                       ы (yeru)         y
+         л (el)         l                       ь (soft sign)    x
+         м (em)         m                       э (e)            ex,e'
+         н (en)         n                       ю (yu)           ux,u'
+         о (o)          o                       я (ya)           q
+         п (pe)         p
+
+Greek alphabet:
+        You should type “|” (bar) before every sequence in order to get greek 
+        letter.
+        α (alpha)       a               ξ (xi)          x
+        β (beta)        b               ο (omicron)     o
+        γ (gamma)       g               π (pi)          p
+        δ (delta)       d               ρ (rho)         r
+        ε (epsilon)     e               ς (final sigma) h,s'
+        ζ (zeta)        z               σ (sigma)       s
+        η (eta)         n,e'            τ (tau)         j,t'
+        θ (theta)       t               υ (upsilon)     u
+        ι (iota)        i               φ (phi)         f
+        κ (kappa)       k               χ (chi)         c
+        λ (lambda)      l               ψ (psi)         y,p',f'
+        μ (mu)          m               ω (omega)       w
+        ν (nu)          v,n'
+
+Quotes:
+        « »     << >>   Double angle quotation marks. (Russian first level
+                        quotes.) (Not present in :latex as “<<” and “>>” are 
+                        already replaced with this quotes.)
+        „ “     ,, ``   Double low-9 and left double quotation marks.
+                        (Russian second level quotes.) (Not present in 
+                        :latex.)
+        “ ”     `` ''   Left and right double quotation marks (English first
+                        level quotes.) (Not present in :latex.)
+        ‘ ’     $' '    Left and right single quotation marks (English
+                        second level quotes.) (Not present in :latex.)
+        ‹ ›     $<,$>   Single left- and right-pointing angle quotation
+                        marks.
+        ‛       $'!     Single high-reversed-9 quotation mark (has same
+                        semantic as english second level opening quote but 
+                        differs in appearance). (Not present in :latex.)
+        ‟       $``     Double high-reversed-9 quotation mark (has same
+                        semantic as english second level opening quote but 
+                        differs in appearance). (Not present in :latex.)
+        ‚       $,      Single low-9 quotation mark.
+
+Punctuation:
+        ’       '       Right single quotation mark (used also to represent
+                        apostrophe). (Not present in :latex.)
+        ʼ       $`      Modifier letter apostrophe. (Not present in :latex.)
+        …       ...     Horizonta ellipsis.
+        ‐       -       Hyphen. (Not present in :latex.)
+        –       --      En dash. (Not present in :latex.)
+        —       ---     Em dash. (Not present in :latex.)
+
+Other typography:
+                ~       Non-breaking space. (Not present in :latex.)
+        а́       a`      Combining acute acent (stress mark). Note that in
+                        Unicode this symbol must go after a letter while in 
+                        LaTeX it must go before letter.
+        ©       (c)     Copyright.
+        ®       (r)     Registered sign (registered trade mark sign).
+        ℗       (p)     Sound recording copyright (latex:textcomp).
+        ™       ^tm,^t) Trade mark.
+        ℠       ^sm,^s) Service mark (latex:textcomp).
+
+Spaces:
+        Not present in :latex.
+
+        _       Thin space.
+        _m      Em space (mutton).
+        _d      En space (nut, half an em).
+        _t      Three-per-em space (thick space).
+        _q      Four-per-em space (mid space).
+        _o      Six-per-em space.
+        _.      Hair space (1/10—1/16 em space)
+
+Units:
+        ‰       $%      Per mille sign.
+        ′       $m      Prime (minutes/feet) (latex/math).
+        ″       $s,$"   Double prime (seconds/inches) (latex/math:mathabx).
+        °       $0      Degree.
+        ℃       $C      Degree celsius (latex:textcomp).
+        ℉       $F      Degree fahrenheit (latex:textcomp).
+        Å       $A      Ångström sign (latex/text).
+        K       $K      Kelvin sign. (Not present in :latex.)
+        Ω       $O      Ohm (latex:textcomp).
+        ℔       $P      Pound.
+
+Constants:
+        ℎ       $h      Planck constant. (Not present in :latex.)
+        ℏ       $h-     Planck constant over two pi (latex/math)
+        π       |p      Pi.
+        ℯ       $e      Natural exponent. (Not present in :latex.)
+
+Sets (latex/math:bbm):
+        ℕ       $N      Natural numbers.
+        ℤ       $Z      Integers.
+        ℚ       $Q      Rational numbers.
+        ℝ       $R      Real numbers.
+        ℂ       $c      Complex numbers
+
+Arrows (latex/math):
+        ←,→     <-,->   Arrow.
+        ↢,↣     <-<,>-> Arrow with tail (latex/math:amssymb).
+        ↤ ↦     <-| |-> Arrow from bar (latex/math:stmaryrd for the second
+                        arrow).
+        ↔       <->     Left right arrow.
+        ⇐,⇒     $<=,=>  Double arrow.
+        ⇍,⇏     /<=,/=> Double arrow with stroke (latex/math:amssymb).
+        ⇔       <=>     Left right double arrow.
+        ⇎       /<=>    Left right double arrow with stroke.
+                        (latex/math:amssymb)
+
+Logic (latex/math):
+        ¬       $!      Logical NOT.
+        ∧,∨     $+,$*   Logical AND, logical OR.
+        ⋀,⋁     $+n,$*n n-Ary logical AND/OR.
+        ⊼,⊽     $+!,$*! Logical NAND and NOR.
+        ⊻       $*x     XOR (latex/math:amssymb)
+        ∀       $a      For all.
+        ∃       $ex     There exists.
+        ∄       $/e     There does not exist (latex/math:amssymb).
+        ∁       $co     Complement (latex/math:amssymb).
+
+Set theory (latex/math):
+        ∩,∪     $u,$U   Intersection and union.
+        ⋂,⋃     $un,$Un n-Ary intersection and union.
+        ∖       |\      Set minus.
+        ∋,∈     $<e,$>e Is element of/contains as member.
+        ∉,∌     /<e,/>e Not an element of/does not contain as member
+                        (latter requires latex/math:mathabx).
+        ⊃,⊂     $<c,$>c Subset of/superset of.
+        ⊄,⊅     /<c,/>c Not a subset of/not a superset of.
+        ⊕,⊗     $+),$*) Direct sum/tensor product.
+        ⋀,⋁     $+n,$*n n-Ary direct sum/tensor product.
+        ∅       $n      Emty set.
+
+Relations (latex/math):
+        ≤,≥     <=,>=   Less/greater-than or equal to.
+        ≪,≫     $<<,$>> Much less/greater-than.
+        ≡,≢     =-,/=-  (Not) identical to.
+        ≠       /=      Not equal to.
+        ≈       $~      Almost equal to.
+        ⊥       $|_     Perpendicular.
+        ∥       $||     Parallel.
+        ∝       $=c     Proportional to.
+
+Other math operations (latex/math):
+        ⊕,⊗     $+),$*) Direct sum/tensor product.
+        ⋀,⋁     $+n,$*n n-Ary direct sum/tensor product.
+        ∙,×     $.,$x   Product.
+        ∕       $//     Division. (Not present in :latex.)
+        ⁄       $/      Fractional slash (replaced by «\frac» command in
+                        :latex).
+        ÷       $/-     Division sign.
+        ∫,∬,∭   $i,$ii,$iii
+                        Integrals (single, double and triple) 
+                        (latex/math:amsmath is required for double and triple 
+                        integrals).
+        ∮,∯,∰   $o,$oo,$ooo
+                        Contour integrals (single, double and triple) 
+                        (latex/math:txfonts is required for double and triple 
+                        integrals).
+        ∲,∳     $oc,$occ
+                        Clockwise/anticlockwise contour integral 
+                        (latex/math:txfonts).
+        ∑,∏     $S,$p   n-Ary sum and product.
+        √,∛,∜   $\,$\3,$\4
+                        Square root, cube root and fourth root.
+        ∂       $d      Partial differential.
+        −       $-      Minus. (Not present in :latex.)
+        ±,∓     +-,-+   Plus-minus and minus-plus signs.
+        ⟨,⟩     |<, |>  Mathematical angle brackets.
+
+Box drawings (not present in :latex):
+        You should type “$t” before every sequence in order to get box drawing 
+        unless you use box transliteration table.
+        ─ h     light horizontal
+        ━ H     heavy horizontal
+        │ v     light vertical
+        ┃ V     heavy vertical
+        ┄ 3h    light triple dash horizontal
+        ┅ 3H    heavy triple dash horizontal
+        ┆ 3v    light triple dash vertical
+        ┇ 3V    heavy triple dash vertical
+        ┈ 4h    light quadruple dash horizontal
+        ┉ 4H    heavy quadruple dash horizontal
+        ┊ 4v    light quadruple dash vertical
+        ┋ 4V    heavy quadruple dash vertical
+        ┌ dr    ligth down and right
+        ┍ dR    down light and right heavy
+        ┎ Dr    down heavy and rigth ligth
+        ┏ DR    heavy down and right
+        ┐ dl    ligth down and left
+        ┑ dL    down ligth and left heavy
+        ┒ Dl    down heavy and left light
+        ┓ DL    heavy down and left
+        └ ur    light up and right
+        ┕ uR    up light and right heavy
+        ┖ Ur    up heavy and right light
+        ┗ UR    heavy up and right
+        ┘ ul    light up and left
+        ┙ uL    up light and left heavy
+        ┚ Ul    up heavy and left light
+        ┛ UL    heavy up and left
+        ├ vr    light vertical and right
+        ┝ vR    vertical light and right heavy
+        ┞ Urd   up heavy and right down light
+        ┟ Dru   down heavy and right up light
+        ┠ Vr    vertical heavy and right light
+        ┡ dRU   down light and right up heavy
+        ┢ uRD   up light and right down heavy
+        ┣ VR    heavy vertical and right
+        ┤ vl    light vertical and left
+        ┥ vL    vertical light and left heavy
+        ┦ Uld   up heavy and left down light
+        ┧ Dlu   down heavy and left up light
+        ┨ Vl    vertical heavy and left light
+        ┩ dLU   down light and left up heavy
+        ┪ uLD   up light and left down heavy
+        ┫ VL    heavy vertical and left
+        ┬ dh    light down and horizontal
+        ┭ Lrd   left heavy and right down light
+        ┮ Rld   right heavy and left down light
+        ┯ dH    down light and horizontal heavy
+        ┰ Dh    down heavy and horizontal light
+        ┱ rLD   right light and left down heavy
+        ┲ lRD   left light and right down heavy
+        ┳ DH    heavy down and horizontal
+        ┴ uh    light up and horizontal
+        ┵ Lru   left heavy and right up light
+        ┶ Rlu   right heavy and left up light
+        ┷ uH    up light and horizontal heavy
+        ┸ Uh    up heavy and horizontal light
+        ┹ rLU   right light and left up heavy
+        ┺ lRU   left light and right up heavy
+        ┻ UH    heavy up and horizontal
+        ┼ vh    light vertical and horizontal
+        ┽ Lrv   left heavy and right vertical light
+        ┾ Rlv   right heavy and left vertical light
+        ┿ vH    vertical light and horizontal heavy
+        ╀ Udh   up heavy and down horizontal light
+        ╁ Duh   down heavy and up horizontal light
+        ╂ Vh    vertical heavy and horizontal light
+        ╃ LUrd  left up heavy and right down light
+        ╄ RUld  right up heavy and left down light
+        ╅ LDru  left down heavy and right up light
+        ╆ RDlu  right down heavy and left up light
+        ╇ dUH   down light and up horizontal heavy
+        ╈ uDH   up light and down horizontal heavy
+        ╉ rLV   right light and left vertical heavy
+        ╊ lRV   left light and right vertical heavy
+        ╋ VH    heavy vertical and horizontal
+        ╌ 2h    light double dash horizontal
+        ╍ 2H    heavy double dash horizontal
+        ╎ 2v    light double dash vertical
+        ╏ 2V    heavy double dash vertical
+        ═ bh    double horizontal
+        ║ bv    double vertical
+        ╒ dbr   down single and right double
+        ╓ bdr   down double and right single
+        ╔ Bdr   double down and right
+        ╕ dbl   down single and left double
+        ╖ bdl   down double and left single
+        ╗ Bdl   double down and left
+        ╘ ubr   up single and right double
+        ╙ bur   up double and right single
+        ╚ Bur   double up and right
+        ╛ ubl   up single and left double
+        ╜ bul   up double and left single
+        ╝ Bul   double up and left
+        ╞ vbr   vertical single and right double
+        ╟ bvr   vertical double and right single
+        ╠ Bvr   double vertical and right
+        ╡ vbl   vertical single and left double
+        ╢ bvl   vertical double and left single
+        ╣ Bvl   double vertical and left
+        ╤ dbh   down single and horizontal double
+        ╥ bdh   down double and horizontal single
+        ╦ Bdh   double down and horizontal
+        ╧ ubh   up single and horizontal double
+        ╨ buh   up double and horizontal single
+        ╩ Buh   double up and horizontal
+        ╪ vbh   vertical single and horizontal double
+        ╫ bvh   vertical double and horizontal single
+        ╬ Bvh   double vertical and horizontal
+        ╭ adr   light arc down and right
+        ╮ adl   light arc down and left
+        ╯ aul   light arc up and left
+        ╰ aur   light arc up and right
+        ╱ /     light diagonal upper right to lower left
+        ╲ \     light diagonal upper left to lower right
+        ╳ x     light diagonal cross
+        ╴ l     light left
+        ╵ u     light up
+        ╶ r     light right
+        ╷ d     light down
+        ╸ L     heavy left
+        ╹ U     heavy up
+        ╺ R     heavy right
+        ╻ D     heavy down
+        ╼ lR    light left and heavy right
+        ╽ uD    light up and heavy down
+        ╾ Lr    heavy left and light right
+        ╿ Ud    heavy up and light down
+
+Combining diacritics (not present in :latex):
+        You should type “$D” before every sequence in order to get combining 
+        symbol unless you use combining transliteration table.
+        à `     GRAVE ACCENT
+        á '     ACUTE ACCENT
+        â ^     CIRCUMFLEX ACCENT
+        ã ~     TILDE
+        ā -     MACRON
+        a̅ --    OVERLINE
+        ă B     BREVE
+        ȧ .     DOT ABOVE
+        ä :     DIAERESIS
+        ả ah    HOOK ABOVE
+        å ar    RING ABOVE
+        a̋ "     DOUBLE ACUTE ACCENT
+        ǎ C     CARON
+        a̍ a|    VERTICAL LINE ABOVE
+        a̎ a||   DOUBLE VERTICAL LINE ABOVE
+        ȁ ``    DOUBLE GRAVE ACCENT
+        a̐ Dc    CANDRABINDU
+        ȃ ib    INVERTED BREVE
+        a̒ t,    TURNED COMMA ABOVE
+        a̓ a,    COMMA ABOVE
+        a̔ e,    REVERSED COMMA ABOVE
+        a̕ r,    COMMA ABOVE RIGHT
+        a̖ b`    GRAVE ACCENT BELOW
+        a̗ b'    ACUTE ACCENT BELOW
+        a̘ blt   LEFT TACK BELOW
+        a̙ brt   RIGHT TACK BELOW
+        a̚ ala   LEFT ANGLE ABOVE
+        a̛ H     HORN
+        a̜ blhr  LEFT HALF RING BELOW
+        a̝ but   UP TACK BELOW
+        a̞ bdt   DOWN TACK BELOW
+        a̟ b+    PLUS SIGN BELOW
+        a̠ b-    MINUS SIGN BELOW
+        a̡ bph   PALATALIZED HOOK BELOW
+        a̢ brh   RETROFLEX HOOK BELOW
+        ạ b.    DOT BELOW
+        a̤ b:    DIAERESIS BELOW
+        ḁ br    RING BELOW
+        a̦ b,    COMMA BELOW
+        a̧ Fc    CEDILLA
+        ą Ao    OGONEK
+        a̩ b|    VERTICAL LINE BELOW
+        a̪ bb    BRIDGE BELOW
+        a̫ bida  INVERTED DOUBLE ARCH BELOW
+        a̬ bC    CARON BELOW
+        a̭ b^    CIRCUMFLEX ACCENT BELOW
+        a̮ bB    BREVE BELOW
+        a̯ biB   INVERTED BREVE BELOW
+        a̰ b~    TILDE BELOW
+        a̱ bm    MACRON BELOW
+        a̲ _     LOW LINE
+        a̳ =     DOUBLE LOW LINE
+        a̴ o~    TILDE OVERLAY
+        a̵ o-    SHORT STROKE OVERLAY
+        a̶ o--   LONG STROKE OVERLAY
+        a̷ o/    SHORT SOLIDUS OVERLAY
+        a̸ o//   LONG SOLIDUS OVERLAY
+        a̹ brhr  RIGHT HALF RING BELOW
+        a̺ bib   INVERTED BRIDGE BELOW
+        a̻ bs    SQUARE BELOW
+        a̼ bS    SEAGULL BELOW
+        a̽ ax    X ABOVE
+        a̾ v~    VERTICAL TILDE
+        a̿ O=    DOUBLE OVERLINE
+        à t`    GRAVE TONE MARK
+        á t'    ACUTE TONE MARK
+        a͂ Gp    GREEK PERISPOMENI
+        a̓ Gk    GREEK KORONIS
+        ä́ Gdt   GREEK DIALYTIKA TONOS
+        aͅ Gy    GREEK YPOGEGRAMMENI
+        a͆ ab    BRIDGE ABOVE
+        a͇ b=    EQUALS SIGN BELOW
+        a͈ b||   DOUBLE VERTICAL LINE BELOW
+        a͉ bla   LEFT ANGLE BELOW
+        a͊ /~    NOT TILDE ABOVE
+        a͋ .~    HOMOTHETIC ABOVE
+        a͌ a~=   ALMOST EQUAL TO ABOVE
+        a͍ blra  LEFT RIGHT ARROW BELOW
+        a͎ bua   UPWARDS ARROW BELOW
+        a͐ >     RIGHT ARROWHEAD ABOVE
+        a͑ alhr  LEFT HALF RING ABOVE
+        a͒ F     FERMATA
+        a͓ bx    X BELOW
+        a͔ b<    LEFT ARROWHEAD BELOW
+        a͕ b>    RIGHT ARROWHEAD BELOW
+        a͖ b>u   RIGHT ARROWHEAD AND UP ARROWHEAD BELOW
+        a͗ arhr  RIGHT HALF RING ABOVE
+        a͘ ar.   DOT ABOVE RIGHT
+        a͙ *     ASTERISK BELOW
+        a͚ oo    DOUBLE RING BELOW
+        a͛ z     ZIGZAG ABOVE
+        a͜ bbb   DOUBLE BREVE BELOW
+        a͝ 2b    DOUBLE BREVE
+        a͞ 2-    DOUBLE MACRON
+        a͟ b2-   DOUBLE MACRON BELOW
+        a͠ 2~    DOUBLE TILDE
+        a͡ ibb   DOUBLE INVERTED BREVE
+        a͢ ->    DOUBLE RIGHTWARDS ARROW BELOW
+        aͣ a     LATIN SMALL LETTER A
+        aͤ e     LATIN SMALL LETTER E
+        aͥ i     LATIN SMALL LETTER I
+        aͦ o     LATIN SMALL LETTER O
+        aͧ u     LATIN SMALL LETTER U
+        aͨ c     LATIN SMALL LETTER C
+        aͩ d     LATIN SMALL LETTER D
+        aͪ h     LATIN SMALL LETTER H
+        aͫ m     LATIN SMALL LETTER M
+        aͬ r     LATIN SMALL LETTER R
+        aͭ t     LATIN SMALL LETTER T
+        aͮ v     LATIN SMALL LETTER V
+        aͯ x     LATIN SMALL LETTER X
+
+Other symbols:
+        №       #       Numero sign
+        ℰ       $E      EMF (electromotive force)
+                        (latex/math:mathrsfs or latex/math:euscript[mathscr])
+        ∞       $I      Infinity (latex/math)
+        ⁰-⁹     ^0-^9   Superscript 0-9. (Not present in :latex.)
+        ₀-₉     _0-_9   Subscript 0—9. (Not present in :latex.)
+        ∠       $/_     Angle.
+
+vim: ft=help:tw=78

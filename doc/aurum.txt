@@ -1,0 +1,38 @@
+*aurum.txt* Plugin for dealing with source files under mercurial control
+==============================================================================
+CONTENTS                                                      *aurum-contents*
+    1. Intro                                             *aurum-intro*
+    2. Functionality provided                            *aurum-functionality*
+        2.1. Commands                                    *aurum-commands*
+        2.2. Functions                                   *aurum-functions*
+        2.3. Variables                                   *aurum-variables*
+    3. Options                                           *aurum-options*
+
+==============================================================================
+1. Intro                                                         *aurum-intro*
+
+Plugin requires some additional plugins:
+  — vimpluginloader
+(with their dependencies).
+==============================================================================
+2. Functionality provided                                *aurum-functionality*
+
+
+------------------------------------------------------------------------------
+2.1. Commands                                                 *aurum-commands*
+
+
+------------------------------------------------------------------------------
+2.2. Functions                                               *aurum-functions*
+
+
+------------------------------------------------------------------------------
+2.3. Variables                                               *aurum-variables*
+
+
+==============================================================================
+3. Options                                                     *aurum-options*
+
+
+
+vim: ft=help:tw=78

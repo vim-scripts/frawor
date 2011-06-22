@@ -1,0 +1,65 @@
+*json.txt*  Utility used to parse and emit JSON data
+==============================================================================
+CONTENTS                                                       *json-contents*
+
+    1. Intro                                      |json-intro|
+    2. Functionality provided                     |json-functionality|
+        2.1. Commands                             |json-commands|
+        2.2. Functions                            |json-functions|
+    3. Options                                    |json-options|
+
+==============================================================================
+1. Intro                                                          *json-intro*
+
+This plugin provides the ability to load JSON encoded data from files and dump 
+Vim variables to files. Data loaded is cached in order to speed up the 
+plugin.
+
+Plugin requires frawor to be installed. It is also recommended having Vim 
+compiled with |+python| feature. This plugin picks up first of demjson, 
+simplejson and json Python modules that is present on your system. Note that 
+vimscript alternative to Python is too slow and does not support surrogate 
+pairs.
+
+==============================================================================
+2. Functionality provided                                 *json-functionality*
+
+This plugin provides one command and four functions. Functions are accessed 
+via dictionary that is a `json' resource (see |frawor-f-addresource|).
+
+------------------------------------------------------------------------------
+2.1. Commands                                                  *json-commands*
+
+:JSONCache {action} ...                                           *:JSONCache*
+            The only command provided by this plugin. Possible actions:
+            Action  Description ~
+            show    Show the contents of the cache in two columns: filename 
+                    and last modification time.
+            purge   Purge cache.
+
+------------------------------------------------------------------------------
+2.2. Functions                                                *json-functions*
+
+All following functions are accessed via `json' resource (see 
+|frawor-f-addresource|).
+
+json.load({file}[, {ignorecache}])                          *json-r-json.load*
+        Load JSON data from file. If {ignorecache} is present and is equal 
+        to 1 then ignore existing cache.
+json.loads({string})                                       *json-r-json.loads*
+        Load JSON data from string.
+json.dump({file}, {data})                                   *json-r-json.dump*
+        Dump JSON-encoded {data} to file {file}.
+json.dumps({data})                                         *json-r-json.dumps*
+        Encode {data} in JSON and return resulting string.
+
+==============================================================================
+3. Options                                                      *json-options*
+                                               *b:jsonOptions* *g:jsonOptions*
+
+                                                            *g:json_UsePython*
+UsePython :: Bool                                           *json-o-UsePython*
+        Specifies whether to use Python or not. Default is 1 if vim was 
+        compiled with |+python|.
+
+vim: ft=help:tw=78
