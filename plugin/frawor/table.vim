@@ -1,7 +1,7 @@
 "▶1 Header
 scriptencoding utf-8
 if !exists('s:_pluginloaded')
-    execute frawor#Setup('0.0', {'@/resources': '0.0'}, 0)
+    execute frawor#Setup('0.1', {'@/resources': '0.0'}, 0)
     finish
 elseif s:_pluginloaded
     finish
@@ -10,9 +10,10 @@ endif
 if exists('*strdisplaywidth')
     let s:F.strdisplaywidth=function('strdisplaywidth')
 else
-    function s:F.strdisplaywidth(str, col)
+    function s:F.strdisplaywidth(str, ...)
         let chars=split(a:str, '\v.@=')
-        let curcol=a:col
+        let col=get(a:000, 0, 0)
+        let curcol=col
         for char in chars
             if char[0] is# "\t"
                 let curcol+=(&ts-curcol%&ts)
@@ -23,7 +24,7 @@ else
                             \  charn==0x3000)
             endif
         endfor
-        return curcol-a:col
+        return curcol-col
     endfunction
 endif
 "▶1 printstr         :: len, String, col, align, hl → col + :echon
@@ -127,6 +128,7 @@ function s:F.printtable(lines, ...)
 endfunction
 "▶1 Register resource
 call s:_f.postresource('printtable', s:F.printtable)
+call s:_f.postresource('strdisplaywidth', s:F.strdisplaywidth)
 "▶1
 call frawor#Lockvar(s:, '_pluginloaded')
 " vim: fmr=▶,▲ sw=4 ts=4 sts=4 et tw=80

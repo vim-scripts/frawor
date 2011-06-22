@@ -922,6 +922,13 @@ hl, hls, hhl, hhls
              as `aligns' has to `align'.
 
 ------------------------------------------------------------------------------
+4.4.1. strdisplaywidth resource                     *frawor-r-strdisplaywidth*
+
+Resource `strdisplaywidth' is defined in plugin/frawor/table. It contains 
+either a reference to |strdisplaywidth()| function or emulation of this 
+function for older Vims.
+
+------------------------------------------------------------------------------
 4.5. base64 resource                                         *frawor-r-base64*
 
 Resource `base64' is defined in plugin/frawor/base64. It is used for 
@@ -1187,6 +1194,9 @@ mapping :: {}                                               *frawor-t-mapping*
                               precise results).
                       %mgid   Mapping group id.
                       %mname  Mapping name.
+
+                      You can use dictionary instead of the function reference 
+                      for the `func' key.
                    3. Function reference: like 2. with `func' set to rhs and 
                       `args' set to [].
                    3. Dictionary: requires presence of plugin/frawor/functions 
@@ -1197,8 +1207,6 @@ mapping :: {}                                               *frawor-t-mapping*
                       just as in the previous clause, though instead of taking 
                       list of arguments from the `rhs' key, it will be taken 
                       from the `args' key.
-                      Note that this is the only way to load non-oneload 
-                      plugin before invoking a mapping.
                                                             *frawor-mk-silent*
         silent     Bool, determines whether mapping will be silent (see 
                    |map-<silent>|). Default value: 0.
@@ -1263,6 +1271,11 @@ mapping :: {}                                               *frawor-t-mapping*
 
                    {addarg} is the additional argument to itself that will be 
                    used on next iteration (ignored if it is equal to zero).
+
+                   You can use dictionary instead of a function reference. In 
+                   this case plugin will be loaded before strfunc will be 
+                   wrapped and called (only if `rhs' is a List or 
+                   Dictionary).
 
                    Note: `passing some keys back' means using |feedkeys()| for 
                    mappings where |frawor-mk-rhs| is a String and 
@@ -1341,5 +1354,11 @@ mapping :: {}                                               *frawor-t-mapping*
                                   |frawor-f-addresource|.
 ==============================================================================
 8. Changelog                                                *frawor-changelog*
+
+@/mappings:
+    0.1: Added possibility to specify dictionaries in `strfunc' and `func' 
+         keys.
+@/table:
+    0.1: Posted strdisplaywidth function
 
 vim: ft=help:tw=78
