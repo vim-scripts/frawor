@@ -1,11 +1,13 @@
 "▶1 Header
 scriptencoding utf-8
-execute frawor#Setup('0.0', {'@/resources': '0.0',
-            \                '@/os':        '0.0'}, 1)
+execute frawor#Setup('0.1', {'@/resources': '0.0',
+            \                '@/os':        '0.0',
+            \                '@/signs':     '0.0',}, 1)
 let s:r={}
 let s:cf='CHECKFAILED'
 let s:cfstr=string(s:cf)
 let s:cfreg='\v^'.s:cf.'$'
+let s:strfuncregstr='''\v^%([sla]@!\w:%(\w|\.)+|%(\V<SNR>\v|s@!\w:)?\w+)$'''
 "▲1
 "Completion  -------------------------------------------------------------------
 "▶1 Path
@@ -126,6 +128,36 @@ function s:F.recupglob(files, fragments, i)
     return s:F.recupglob(filter(glist, 's:_r.os.path.isdir(v:val)'),
                 \        a:fragments, a:i+1)
 endfunction
+"▶1 getfromhelp :: intvar, helpfroot, sectstr, init, Procline → ? + s:{intvar}
+function s:F.getfromhelp(intvar, helpfile, sectstr, init, Procline)
+    if has_key(s:, a:intvar)
+        return copy(s:{a:intvar})
+    endif
+    let s:{a:intvar}=a:init
+    let helpfile=s:_r.os.path.join($VIMRUNTIME, 'doc', a:helpfile.'.txt')
+    if !filereadable(helpfile)
+        return a:init
+    endif
+    let help=readfile(helpfile)
+    let ruler=repeat('=', 78)
+    let slen=len(a:sectstr)-1
+    while !empty(help)
+        if remove(help, 0) is# ruler
+            if remove(help, 0)[:(slen)] is# a:sectstr
+                while !empty(help)
+                    let line=remove(help, 0)
+                    let r=call(a:Procline, [line, s:{a:intvar}], {})
+                    if r is 0
+                        break
+                    endif
+                endwhile
+                break
+            endif
+        endif
+    endwhile
+    lockvar! s:{a:intvar}
+    return copy(s:{a:intvar})
+endfunction
 "▶1 getuserfunctions :: () → [[fname, fargs*]]
 " TODO cache results
 function s:F.getuserfunctions()
@@ -137,57 +169,169 @@ function s:F.getuserfunctions()
                 \'[v:val[0]]+split(v:val[1], ", ")')
 endfunction
 "▶1 getinternalfunctions :: () + s:vimintfuncs → {fname: [length]}
+function s:F.getintfunc(line, intfuncs)
+    if empty(a:line) && !empty(a:intfuncs)
+        return 0
+    endif
+    let match=matchlist(a:line, '\v(\w+)\((.{-})\)')
+    if empty(match)
+        return -1
+    endif
+    let fname=match[1]
+    if !exists('*'.fname)
+        return -1
+    endif
+    let fargs=substitute(match[2], '\s', '', 'g')
+    let lengths=[]
+    if stridx(fargs, '...')!=-1
+        call add(lengths, -1)
+    endif
+    let bidx=stridx(fargs, '[')
+    if bidx!=-1
+        while bidx!=-1
+            call add(lengths, len(split(fargs[:(bidx)], ','))+get(lengths,-1,0))
+            let fargs=fargs[(bidx+1):]
+            let bidx=stridx(fargs, '[')
+        endwhile
+    else
+        call add(lengths, len(split(fargs, ',')))
+    endif
+    let a:intfuncs[fname]=lengths
+    return 1
+endfunction
 function s:F.getinternalfunctions()
-    if exists('s:vimintfuncs')
-        return copy(s:vimintfuncs)
+    return s:F.getfromhelp('vimintfuncs', 'eval', '4. Builtin Functions', {},
+                \          s:F.getintfunc)
+endfunction
+"▶1 getusercommands :: () + :command → [String]
+function s:F.getusercommands()
+    redir => commands
+    silent command
+    redir END
+    return map(split(commands, "\n")[1:], 'matchstr(v:val, "\\v\\w+")')
+endfunction
+"▶1 getinternalcommands :: () + s:vimintfuncs → [String]
+function s:F.getintcmd(line, intcmds)
+    if empty(a:line) && !empty(a:intcmds)
+        return 0
+    elseif a:line[:1] isnot# '|:'
+        return -1
     endif
-    let s:vimintfuncs={}
-    let helpfile=s:_r.os.path.join($VIMRUNTIME, 'doc', 'eval.txt')
-    if !filereadable(helpfile)
-        return copy(s:vimintfuncs)
+    let cmd=matchstr(a:line, '\v\s\:\S+')[2:]
+    if !empty(cmd)
+        let cmd=substitute(cmd, '\W', '', 'g')
+        if exists(':'.cmd)
+            call add(a:intcmds, cmd)
+        endif
     endif
-    let help=readfile(helpfile)
-    let ruler=repeat('=', 78)
-    let section=''
-    while !empty(help)
-        if remove(help, 0) is# ruler
-            if remove(help, 0)[:19] is# '4. Builtin Functions'
-                while !empty(help)
-                    let line=remove(help, 0)
-                    if empty(line) && !empty(s:vimintfuncs)
-                        break
+    return 1
+endfunction
+function s:F.getinternalcommands()
+    return s:F.getfromhelp('vimintcommands', 'index', '5. EX commands', [],
+                \          s:F.getintcmd)
+endfunction
+"▶1 getevents :: () + s:vimintfuncs → [String]
+function s:F.getevent(line, events)
+    if a:line[0] isnot# '|'
+        return -1
+    elseif a:line[-20:] is# '*autocmd-events-abc*'
+        return 0
+    endif
+    let event=matchstr(a:line, '\v^\|\u\w+\|')[1:-2]
+    if !empty(event) && exists('##'.event)
+        call add(a:events, event)
+    endif
+    return 1
+endfunction
+function s:F.getevents()
+    return s:F.getfromhelp('vimevents', 'autocmd', '5. Events', [],
+                \          s:F.getevent)
+endfunction
+"▶1 getsigns :: () → [String]
+function s:F.getsigns()
+    if !has('signs')
+        return []
+    endif
+    redir => signs
+    silent sign list
+    redir END
+    return map(split(signs, "\n"), 'v:val[5:(stridx(v:val, " ", 5)-1)]')
+endfunction
+"▶1 getaugroups :: () → [String]
+function s:F.getaugroups()
+    if !has('autocmd')
+        return []
+    endif
+    redir => augroups
+    silent augroup
+    redir END
+    return split(split(augroups, "\n")[0])
+endfunction
+"▶1 gethighlights :: () → [String]
+function s:F.gethighlights()
+    if !has('syntax')
+        return []
+    endif
+    redir => hls
+    silent hi
+    redir END
+    return map(filter(split(hls, "\n"), 'v:val[0] isnot# " "'),
+                \'v:val[:(stridx(v:val, " ")-1)]')
+endfunction
+"▶1 getoptions :: () + :set → [(String, 0|1|2)]
+" 0: Boolean option
+" 1: Number option
+" 2: String option
+function s:F.getoptions()
+    if exists('s:vimoptions')
+        return copy(s:vimoptions)
+    endif
+    redir => options
+    silent set all
+    redir END
+    let s:vimoptions=[]
+    let ismanyoptline=1
+    for line in split(options, "\n")[1:]
+        if ismanyoptline
+            let addedoptions=0
+            while !empty(line)
+                let line=substitute(line, '\v^\s+', '', '')
+                let option=''
+                if line=~#'\v\l+\='
+                    let option=line[:(stridx(line, '=')-1)]
+                    let bool=0
+                else
+                    let option=matchstr(line, '\v^\l+')
+                    if option[:1] is# 'no' && !exists('&'.option)
+                        let option=option[2:]
                     endif
-                    let match=matchlist(line, '\v(\w+)\((.{-})\)')
-                    if empty(match)
-                        continue
-                    endif
-                    let fname=match[1]
-                    let fargs=substitute(match[2], '\s', '', 'g')
-                    let lengths=[]
-                    if stridx(fargs, '...')!=-1
-                        call add(lengths, -1)
-                    endif
-                    let bidx=stridx(fargs, '[')
-                    if bidx!=-1
-                        while bidx!=-1
-                            call add(lengths, len(split(fargs[:(bidx)], ','))
-                                        \                  +get(lengths, -1, 0))
-                            let fargs=fargs[(bidx+1):]
-                            let bidx=stridx(fargs, '[')
-                        endwhile
-                    else
-                        call add(lengths, len(split(fargs, ',')))
-                    endif
-                    let s:vimintfuncs[fname]=lengths
-                endwhile
-                call filter(s:vimintfuncs, 'exists("*".v:key)')
-                break
+                    let bool=1
+                endif
+                if exists('+'.option)
+                    let type=((bool)?(0):
+                                \    ((type(eval('&'.option))==type(0))?(1):
+                                \                                       (2)))
+                    call add(s:vimoptions, [option, type])
+                endif
+                let line=substitute(line, '\v^\S+', '', '')
+                let addedoptions+=1
+            endwhile
+            if addedoptions==1
+                let ismanyoptline=0
+            endif
+        else
+            let option=matchstr(line, '\v\l+')
+            if exists('+'.option)
+                let type=((type(eval('&'.option))==type(0))?(1):(2))
+                call add(s:vimoptions, [option, type])
             endif
         endif
-    endwhile
-    lockvar s:vimintfuncs
-    return copy(s:vimintfuncs)
+    endfor
+    lockvar! s:vimoptions
+    return copy(s:vimoptions)
 endfunction
+"▶1 compexpr :: () + ? → [String]
+" TODO
 "▲1
 "Filters/checkers --------------------------------------------------------------
 "▶1 `func', `eval'
@@ -642,6 +786,109 @@ function s:r.haskey.check(desc, idx, type)
                     \         'keymis', a:idx, keystr)
     endif
 endfunction
+"▶1 `idof'
+" Check whether argument is an identifier
+let s:r.idof={'args': ['get']}
+let s:idab={
+            \ 'var': 'variable',
+            \  'hl': 'highlight',
+            \ 'cmd': 'command',
+            \'func': 'function',
+            \ 'opt': 'option',
+        \}
+let s:ids=values(s:idab)+['event', 'augroup', 'sign']
+"▶2 idof.get :: &self!
+" Input: "variable"  | "var"
+"      | "highlight" | "hl"
+"      | "command"   | "cmd"
+"      | "function"  | "func"
+"      | "option"    | "opt"
+"      | "event"
+"      | "augroup"
+"      | "sign"
+" Output: add({idspec})
+function s:r.idof.get()
+    let c=self.readc()
+    if has_key(s:idab, c)
+        call self.add(s:idab[c])
+    elseif index(s:ids, c)!=-1
+        call self.add(c)
+    else
+        call self.throw('invid', c)
+    endif
+    return self
+endfunction
+"▶2 check
+function s:r.idof.check(desc, idx, type)
+    let curargstr=self.argstr()
+    call self.addtypecond([type('')], a:idx)
+    let spec=a:desc[1]
+    if spec is# 'highlight'
+        call self.nextthrow('!hlexists('.curargstr.')',
+                    \       'nohl', a:idx, curargstr)
+    elseif spec is# 'command'
+        call self.nextthrow('!exists(":".'.curargstr.')',
+                    \       'nocmd', a:idx, curargstr)
+    elseif spec is# 'function'
+        call self.nextthrow('!('.curargstr.'=~#'.s:strfuncregstr.
+                    \        ' && exists("*".'.curargstr.'))',
+                    \       'nofunc', a:idx, curargstr)
+    elseif spec is# 'option'
+        call self.nextthrow('!exists("+".'.curargstr.')',
+                    \       'noopt', a:idx, curargstr)
+    elseif spec is# 'event'
+        call self.nextthrow('!exists("##".'.curargstr.')',
+                    \       'noevent', a:idx, curargstr)
+    elseif spec is# 'augroup'
+        call self.nextthrow('stridx('.curargstr.', "#")!=-1 || '.
+                    \       '!exists("#".'.curargstr.')',
+                    \       'noaug', a:idx, curargstr)
+    elseif spec is# 'sign'
+        let signexistsstr=self.getfunstatvar('sign', s:_r.sign.exists, 'exists')
+        call self.nextthrow('!'.signexistsstr.'('.curargstr.')',
+                    \       'nosign', a:idx, curargstr)
+    elseif spec is# 'variable'
+        call self.nextthrow(curargstr.'!~#''\v^[als]@!\l\:\w*$'' || '.
+                    \       '!exists('.curargstr.')',
+                    \       'novar', a:idx, curargstr)
+    endif
+    return self
+endfunction
+"▶2 complete
+let s:varsstr=join(map(split('vgbwt', '\v.@='),
+            \          '"map(keys(".v:val.":), \"''".v:val.":''.v:val\")"'),
+            \      '+')
+let s:idofcompletes={'highlight': 1, 'event': 1, 'augroup': 1, 'sign': 1}
+function s:r.idof.complete(desc, idx, type)
+    let spec=a:desc[1]
+    if has_key(s:idofcompletes, spec)
+        let getvariantsstr=self.getfunstatvar('completers', s:F['get'.spec.'s'],
+                    \                         spec.'s').'()'
+        return self.addmatches(getvariantsstr, type([]))
+    elseif spec is# 'command'
+        let intcmdsstr=self.getfunstatvar('completers', s:F.getinternalcommands,
+                    \                     'commands').'()'
+        let usercmdsstr=self.getfunstatvar('completers', s:F.getusercommands,
+                    \                      'ucommands').'()'
+        return self.addmatches(intcmdsstr.'+'.usercmdsstr, type([]))
+    elseif spec is# 'function'
+        let userfunctionsstr='map('.self.getfunstatvar('completers',
+                    \                                  s:F.getuserfunctions,
+                    \                                  'userfunctions').'(), '.
+                    \            '"v:val[0]")'
+        let intfuncsstr='keys('.self.getfunstatvar('completers',
+                    \                              s:F.getinternalfunctions,
+                    \                              'vimfunctions').'())'
+        return self.addmatches(userfunctionsstr.'+'.intfuncsstr, type([]))
+    elseif spec is# 'option'
+        let intoptsstr='map('.self.getfunstatvar('completers', s:F.getoptions,
+                    \                            'options').'(), "v:val[0]")'
+        return self.addmatches(intoptsstr, type([]))
+    elseif spec is# 'variable'
+        return self.addmatches(s:varsstr, type([]))
+    endif
+endfunction
+"▲2
 "▶1 `range'
 " Checks whether {argument} is in given range
 let s:r.range={'args': ['number', 'number', '?one']}
@@ -984,9 +1231,7 @@ function s:r.isfunc.check(desc, idx, type)
                     \          frefpref .' isnot# "s:" && '.
                     \          frefpref2.'    !=? "<SID>") '.
                     \        '|| (type('.curargstr.')=='.type('').
-                    \            '&& '.curargstr.'=~#'.
-                    \             '''\v^%([sla]@!\w:%(\w|\.)+|'.
-                    \                    '%(<SNR>|s@!\w:)?\w+)$'''.
+                    \            '&& '.curargstr.'=~#'.s:strfuncregstr.
                     \            '&& exists("*".'.curargstr.')))',
                     \       'nsfunc', a:idx, 'string('.curargstr.')')
     endif

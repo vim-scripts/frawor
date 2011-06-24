@@ -20,6 +20,7 @@ let s:_messages={
             \  'actmis': 'missing arguments description',
             \ 'typemis': 'missing type description',
             \ 'invtype': 'invalid type description: %s',
+            \   'invid': 'invalid identifier description: %s',
             \  'invreg': 'invalid regular expression: %s',
             \ 'wordend': 'regular expression cannot end with %s',
             \  'noexpr': 'expected expression, but got nothing',

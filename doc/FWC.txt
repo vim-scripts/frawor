@@ -548,6 +548,19 @@ haskey {string}*   (|FWC-{string}|)                             *FWC-c-haskey*
              keys.
     Completer: undefined.
 
+idof {idspec}                                                     *FWC-c-idof*
+    Checker: check whether current argument is an identifier of the given 
+             essence.
+                {idspec} :: "variable"  | "var"                 *FWC-{idspec}*
+                          | "highlight" | "hl"
+                          | "command"   | "cmd"
+                          | "function"  | "func"
+                          | "option"    | "opt"
+                          | "event"
+                          | "augroup"
+                          | "sign"
+    Completer: completes list of possible variants.
+
 range {number} {number} {one}   (|FWC-{one}|)                    *FWC-c-range*
     Checker: check whether current argument is a number or float and is in 
              given range. Floating-point values are not allowed unless one of 

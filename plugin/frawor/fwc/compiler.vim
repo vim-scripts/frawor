@@ -49,6 +49,14 @@ call extend(s:_messages, map({
             \   'ninlist': 'argument is not in list',
             \ 'invlstlen': 'invalid list length: expected %u, but got %u',
             \'eitherfail': 'all alternatives failed',
+            \      'nohl': 'unknown highlight group: %s',
+            \     'nocmd': 'no such command: %s',
+            \    'nofunc': 'no such function: %s',
+            \     'noopt': 'no such option: %s',
+            \   'noevent': 'event %s is not supported',
+            \     'noaug': 'autocmd group %s is not defined',
+            \    'nosign': 'unknown sign: %s',
+            \     'novar': 'no such variable: %s',
             \     'isdir': 'not a directory: %s',
             \    'isfile': 'directories are not accepted: %s',
             \    'nwrite': '%s is not writable',
@@ -446,6 +454,19 @@ function s:compiler.getstring(str)
     endif
     return self.getvar(a:str)
 endfunction
+"▶1 getmatchstr     :: ldstr, exptype, varname + self → vimlexpr + self
+function s:compiler.getmatchstr(ldstr, exptype, ldtmp)
+    if a:exptype==type([])
+        return 'copy('.a:ldstr.')'
+    elseif a:exptype==type({})
+        return 'sort(keys('.a:ldstr.'))'
+    else
+        call self.let(a:ldtmp, a:ldstr)
+        return '((type('.a:ldtmp.')=='.type([]).')?'.
+                    \'('.a:ldtmp.'):'.
+                    \'(sort(keys('.a:ldtmp.'))))'
+    endif
+endfunction
 "▶1 addmatches      :: &self(ldstr, exptype)
 function s:compiler.addmatches(ldstr, exptype)
     if self.joinlists
@@ -458,31 +479,26 @@ function s:compiler.addmatches(ldstr, exptype)
 endfunction
 "▶1 addjoinedmtchs  :: &self
 function s:compiler.addjoinedmtchs()
-    if !self.joinlists
-        let lststrs=[]
+    if !self.joinlists && !empty(self.ldstrs)
         let curldbase=self.getlvarid('curld').'_'
-        let ambstrs=[]
-        let i=0
-        for [ldstr, exptype] in remove(self.ldstrs, 0, -1)
-            if exptype==type([])
-                call add(lststrs, ldstr)
-            elseif exptype==type({})
-                call add(lststrs, 'sort(keys('.ldstr.'))')
-            else
-                let curldstr=curldbase.i
-                call add(ambstrs, curldstr)
-                call self.let(curldstr, ldstr)
-                call add(lststrs, '((type('.curldstr.')=='.type([]).')?'.
-                            \           '('.curldstr.'):'.
-                            \           '(sort(keys('.curldstr.'))))')
-            endif
-            let i+=1
-        endfor
+        let lststrs=map(remove(self.ldstrs, 0, -1),
+                    \   'self.getmatchstr(v:val[0], v:val[1], curldbase.v:key)')
         call self.addmatches(join(lststrs, '+'), type([]))
-        if !empty(ambstrs)
-            call self.unlet(ambstrs)
-        endif
     endif
+    return self
+endfunction
+"▶1 joinmatches     :: &self(idx, varname)
+function s:compiler.joinmatches(jstart, matchesstr)
+    if len(self.ldstrs)<=a:jstart
+        return self
+    endif
+    let curldbase=self.getlvarid('curld').'_'
+    call self.let(a:matchesstr,
+                \ join(map(remove(self.ldstrs, a:jstart, -1),
+                \          'self.getmatchstr(v:val[0], v:val[1], '.
+                \                           'curldbase.v:key)'),
+                \      '+'))
+    call add(self.ldstrs, [a:matchesstr, type([])])
     return self
 endfunction
 "▶1 addthrow        :: &self(msg::String, msgarg, needcurarg, ...)
@@ -602,15 +618,15 @@ function s:compiler.optgetconds()
                 \&& len(self.l[0])>2
                 \&& self.l[0][0] is# 'if'
                 \&& ((self.l[0][-1] is# 'endif'
-                \  && self.l[0][-3] isnot 'else')
-                \ || (self.l[0][-2] isnot 'else'))
+                \  && self.l[0][-3] isnot# 'else')
+                \ || (self.l[0][-2] isnot# 'else'))
         let conditions=[]
         let iftree=copy(self.l[0])
         while !empty(iftree)
             let type=remove(iftree, 0)
             if type is# 'if' || type is# 'elseif'
                 let [condition, block]=remove(iftree, 0, 1)
-                if block isnot# [['throw', s:cfstr]]
+                if block!=#[['throw', s:cfstr]]
                     return 0
                 endif
                 call add(conditions, condition)
@@ -624,9 +640,9 @@ function s:compiler.optgetconds()
     endif
     return 0
 endfunction
-"▶1 optimizecompf   :: &self
+"▶1 optimizecompf   :: &self(varname)
 " XXX low-level hacks here
-function s:compiler.optimizecompf()
+function s:compiler.optimizecompf(vstr)
     call self.down(self.l[2][-1][1])
     let conditions=self.optgetconds()
     call self.up()
@@ -635,12 +651,12 @@ function s:compiler.optimizecompf()
         let argidxstr=self.l[-1][1][-1][1]
         let removestr=self.l[-1][-1][0][1]
         let condition=join(conditions, ' || ')
-        let chargstr='@-@['.argidxstr.']'
+        let chargstr=a:vstr.'['.argidxstr.']'
         if condition=~#'\v^%([^@]|\V'.chargstr.'\v)+$'
             call self.up().up()
             call remove(self.l, -2, -1)
             let condition=substitute(condition, '\V'.chargstr, 'v:val', 'g')
-            call self.call('filter(@-@, '.string('!('.condition.')').')')
+            call self.call('filter('.a:vstr.', '.string('!('.condition.')').')')
         else
             call remove(self.l, -1)
             call self.if(condition)
@@ -792,6 +808,8 @@ function s:compiler.compilearg(argcon, idx, type)
         let addedcompletion=0
         let addedcycle=0
         let argidxstr=self.getlvarid('argidx')
+        let vstr='@-@'
+        let jstart=len(self.ldstrs)
     endif
     for proc in arg
         let i+=1
@@ -806,11 +824,17 @@ function s:compiler.compilearg(argcon, idx, type)
         if a:type is# 'complete'
             if addedcompletion && !addedcycle
                 let addedcycle=1
+                if self.joinlists && vstr is# '@-@'
+                    let mtchsstr=self.getlvarid('matches').'_'.matchstr(a:idx,
+                                \                                      '\v\d+$')
+                    let vstr=mtchsstr
+                    call self.joinmatches(jstart, mtchsstr)
+                endif
                 call self.let(argidxstr, 0)
-                            \.while(argidxstr.'<len(@-@)')
+                            \.while(argidxstr.'<len('.vstr.')')
                                 \.try()
                                     \.pushms('throwignore')
-                                    \.witharg(['@-@', [[argidxstr]]])
+                                    \.witharg([vstr, [[argidxstr]]])
             elseif compargs[0][1][0] is# 'intfunc' &&
                         \has_key(s:_r.FWC_intfuncs[compargs[0][1][1]],
                         \        'breakscomp')
@@ -843,10 +867,10 @@ function s:compiler.compilearg(argcon, idx, type)
         call self.without().popms()
                     \.increment(argidxstr)
                 \.up().catch(s:cfreg)
-                    \.call('remove(@-@, '.argidxstr.')')
+                    \.call('remove('.vstr.', '.argidxstr.')')
                 \.up()
             \.up().up()
-            \.optimizecompf()
+            \.optimizecompf(vstr)
     endif
     return self
 endfunction
@@ -1017,5 +1041,6 @@ endfunction
 call s:_f.postresource('fwc_compile', s:F.compstr)
 "▶1
 " TODO implement recursive structures checking
+" TODO cache compilation results
 call frawor#Lockvar(s:, '')
 " vim: fmr=▶,▲ sw=4 ts=4 sts=4 et tw=80

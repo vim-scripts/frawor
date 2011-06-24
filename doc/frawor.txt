@@ -812,34 +812,34 @@ os.run :: [command[, arg1[, arg2[, ...]]]][, path]           *frawor-r-os.run*
         run.
         Note that os.run depends on 'shell', 'shellquote', 'shellxquote' and 
         'shellcmdflag' options being set correctly.
-os.path.abspath :: path + FS -> path                *frawor-r-os.path-abspath*
+os.path.abspath :: path + FS -> path                *frawor-r-os.path.abspath*
         Returns an absolute path.
-os.path.realpath :: path + FS -> path              *frawor-r-os.path-realpath*
+os.path.realpath :: path + FS -> path              *frawor-r-os.path.realpath*
         Returns an absolute path with all symbolic links resolved.
-os.path.normpath :: path -> path                   *frawor-r-os.path-normpath*
+os.path.normpath :: path -> path                   *frawor-r-os.path.normpath*
         Normalize path by removing duplicate path separators.
-os.path.basename :: path -> component              *frawor-r-os.path-basename*
+os.path.basename :: path -> component              *frawor-r-os.path.basename*
         Returns the final component of a path.
-os.path.dirname :: path -> path                     *frawor-r-os.path-dirname*
+os.path.dirname :: path -> path                     *frawor-r-os.path.dirname*
         Returns the directory component of a path.
-os.path.join :: [ path ] -> path                       *frawor-r-os.path-join*
+os.path.join :: [ path ] -> path                       *frawor-r-os.path.join*
         Joins path components into one path, removing duplicate path 
         separators. The following calls are equivalent: >
             let path=s:_r.os.path.join("foo", "bar")
             let path=s:_r.os.path.join(["foo", "bar"])
-os.path.split :: path -> [ component ]                *frawor-r-os.path-split*
+os.path.split :: path -> [ component ]                *frawor-r-os.path.split*
         Returns a list of path components starting either from root (`/' on 
         posix systems, `{DriveCharacter}:' on nt systems) or from current 
         directory ('.').
-os.path.samefile :: path, path + FS -> Bool        *frawor-r-os.path-samefile*
+os.path.samefile :: path, path + FS -> Bool        *frawor-r-os.path.samefile*
         Returns 1 if both pathnames refer to the same actual file.
-os.path.exists :: path + FS -> Bool                  *frawor-r-os.path-exists*
+os.path.exists :: path + FS -> Bool                  *frawor-r-os.path.exists*
         Returns 1 if file or directory with given name exists, 0 otherwise.
-os.path.isdir :: path + FS -> Bool                    *frawor-r-os.path-isdir*
+os.path.isdir :: path + FS -> Bool                    *frawor-r-os.path.isdir*
         Returns 1 if given path is existing directory, 0 otherwise.
-os.path.isfile :: path + FS -> Bool                  *frawor-r-os.path-isfile*
+os.path.isfile :: path + FS -> Bool                  *frawor-r-os.path.isfile*
         Returns 1 if given path is existing file, 0 otherwise.
-                                                       *frawor-r-os.path-walk*
+                                                       *frawor-r-os.path.walk*
 os.path.walk :: path, (arg, path, [ component ] -> _)[, arg] + FS -> _
         Directory tree walk with callback function:
         For each directory in the directory tree rooted at top (including top 
@@ -1380,5 +1380,7 @@ mapping :: {}                                               *frawor-t-mapping*
          keys.
 @/table:
     0.1: Posted strdisplaywidth function
+@/fwc:
+    0.1: (intfuncs-0.1) Added `idof' checker
 
 vim: ft=help:tw=78
