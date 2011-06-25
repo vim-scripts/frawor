@@ -136,7 +136,7 @@ function s:parser.readreg(endstr)
     if !empty(self.ungot)
         call self.throw('int', 'regungetc')
     endif
-    if a:endstr=~#'^\w'
+    if a:endstr=~#'\v^\w'
         call self.throw('wordend', a:endstr)
     endif
     let c=matchstr(self.s, '\v(\\.|[^\\'.escape(a:endstr, '\]^-').'])+'.

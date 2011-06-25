@@ -401,7 +401,7 @@ function s:r.run.complete(desc, idx, type)
         " XXX a:desc[1] contains one more items then required, as well as output 
         " of getuserfunctions
         let ldescr=len(a:desc[1])
-        return self.addmatches('map(filter('.getuserfunctionsstr.
+        return self.setmatches('map(filter('.getuserfunctionsstr.
                     \          ', "len(v:val)=='.ldescr.' || '.
                     \             '(len(v:val)<='.(ldescr+1).' && '.
                     \              'v:val[-1] is# ''...'')"), "v:val[0]")+'.
@@ -411,7 +411,7 @@ function s:r.run.complete(desc, idx, type)
                     \                          'v:val[-1]<='.(ldescr).')")))',
                     \          type([]))
     endif
-    return self.addmatches('map('.getuserfunctionsstr.', "v:val[0]")', type([]))
+    return self.setmatches('map('.getuserfunctionsstr.', "v:val[0]")', type([]))
 endfunction
 "▶1 `earg'
 " Replaces {argument} with the result of evaluating itself
@@ -502,7 +502,7 @@ function s:r.first.complete(desc, idx, type)
     endif
     let i=1
     for arg in a:desc[1][1:]
-        call self.if('empty(@-@)')
+        call self.if('empty('.self.vstrs[-1].')')
                     \.compilearg(arg, a:idx.'(either).'.i, 'complete')
                 \.up().endif()
         let i+=1
@@ -715,7 +715,7 @@ function s:r.in.pipe(desc, idx, type, ...)
     endif
 endfunction
 function s:r.in.complete(desc, idx, type)
-    return self.addmatches(self.getvar(a:desc[1]), type([]))
+    return self.setmatches(self.getvar(a:desc[1]), type([]))
 endfunction
 "▶1 `key'
 let s:r.key={'args': ['var', '?omtchr']}
@@ -732,7 +732,7 @@ function s:r.key.pipe(...)
     return call(s:r.in.pipe, a:000+['key'], self)
 endfunction
 function s:r.key.complete(desc, idx, type)
-    return self.addmatches(self.getvar(a:desc[1]), type({}))
+    return self.setmatches(self.getvar(a:desc[1]), type({}))
 endfunction
 "▶1 `take'
 " Replaces {argument} with value of the first key from {var}::Dictionary that 
@@ -864,13 +864,13 @@ function s:r.idof.complete(desc, idx, type)
     if has_key(s:idofcompletes, spec)
         let getvariantsstr=self.getfunstatvar('completers', s:F['get'.spec.'s'],
                     \                         spec.'s').'()'
-        return self.addmatches(getvariantsstr, type([]))
+        return self.setmatches(getvariantsstr, type([]))
     elseif spec is# 'command'
         let intcmdsstr=self.getfunstatvar('completers', s:F.getinternalcommands,
                     \                     'commands').'()'
         let usercmdsstr=self.getfunstatvar('completers', s:F.getusercommands,
                     \                      'ucommands').'()'
-        return self.addmatches(intcmdsstr.'+'.usercmdsstr, type([]))
+        return self.setmatches(intcmdsstr.'+'.usercmdsstr, type([]))
     elseif spec is# 'function'
         let userfunctionsstr='map('.self.getfunstatvar('completers',
                     \                                  s:F.getuserfunctions,
@@ -879,13 +879,13 @@ function s:r.idof.complete(desc, idx, type)
         let intfuncsstr='keys('.self.getfunstatvar('completers',
                     \                              s:F.getinternalfunctions,
                     \                              'vimfunctions').'())'
-        return self.addmatches(userfunctionsstr.'+'.intfuncsstr, type([]))
+        return self.setmatches(userfunctionsstr.'+'.intfuncsstr, type([]))
     elseif spec is# 'option'
         let intoptsstr='map('.self.getfunstatvar('completers', s:F.getoptions,
                     \                            'options').'(), "v:val[0]")'
-        return self.addmatches(intoptsstr, type([]))
+        return self.setmatches(intoptsstr, type([]))
     elseif spec is# 'variable'
-        return self.addmatches(s:varsstr, type([]))
+        return self.setmatches(s:varsstr, type([]))
     endif
 endfunction
 "▲2
@@ -1151,7 +1151,7 @@ function s:r.path.complete(desc, idx, type)
         endif
     endif
     let getfilesstr=self.getfunstatvar('completers', s:F.getfiles, 'path')
-    return self.addmatches(getfilesstr.'('.self.comparg.', '.
+    return self.setmatches(getfilesstr.'('.self.comparg.', '.
                 \                          self.string(filter).', 1)', type([]))
 endfunction
 "▶1 `type'

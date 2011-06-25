@@ -18,9 +18,7 @@ function s:history.get(htype)
     return r
 endfunction
 "▶1 history.clear :: htype → + history
-function s:history.clear(htype)
-    while histdel(a:htype, -1) | endwhile
-endfunction
+let s:history.clear=function('histdel')
 "▶1 history.set :: htype, [String] → + history
 function s:history.set(htype, histlines)
     call s:history.clear(a:htype)
@@ -34,12 +32,9 @@ endfunction
 "▶1 Post resource
 call s:_f.postresource('history', s:history)
 "▶1 Create altspecial
+let s:histtypes=['input', '@', 'expr', '=', 'cmd', ':', 'search', '/']
 function s:F.histchecker(arg)
-    try
-        return histnr(a:arg[0])!=-1
-    catch
-        return 0
-    endtry
+    return index(s:histtypes, a:arg[0])!=-1
 endfunction
 function s:F.histset(histlines, htype)
     return s:history.set(a:htype, a:histlines)

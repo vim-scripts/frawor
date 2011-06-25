@@ -289,7 +289,7 @@ function s:r.prefixes.compile(adescr, idx, caidxstr, largsstr, purgemax, type,
         endif
     else
         call self.addif(a:caidxstr.'=='.a:largsstr.'-1')
-                    \.addmatches(plstr, type([]))
+                    \.setmatches(plstr, type([]))
                     \.break()
                 \.up()
     endif
@@ -480,7 +480,7 @@ function s:r.next.compile(adescr, idx, caidxstr, largsstr, purgemax, type,
                                 \.increment(a:caidxstr)
                             \.up()
                         \.catch(s:cfreg)
-                            \.call('remove(@$@variants, 0, -1)')
+                            \.call('remove('.self.vstrs[-1].', 0, -1)')
                         \.up()
         endif
     else
@@ -597,7 +597,7 @@ function s:r.actions.compile(adescr, idx, caidxstr, largsstr, purgemax, type,
     let curargstr=self.argstr()
     if a:type is# 'complete'
         call self.addif(a:largsstr.'-1 == '.self.getlastsub())
-                        \.addmatches(fsastr, type([]))
+                        \.setmatches(fsastr, type([]))
         let savedsub=copy(self.subs[-1])
         if noact isnot 0 && len(noact)>1
             let self.onlyfirst+=1
