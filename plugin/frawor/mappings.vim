@@ -501,7 +501,6 @@ function s:F.maprun(mgid, mapname, mode, lhs, ...)
 endfunction
 "▶1 opfunc        :: mtype → <expr> + ?
 function s:opfunc(mtype)
-    setlocal operatorfunc=
     let mrargs=s:mrargs
     unlet s:mrargs
     call add(mrargs, a:mtype)

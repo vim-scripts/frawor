@@ -405,7 +405,8 @@ function s:compiler.getvar(var, ...)
     elseif a:var[0] is# 'string'
         let r=[self.string(a:var[1])]
     elseif a:var[0] is# 'argument'
-        let r=[self.argbase, [self.subs[0]+a:var[1]]+a:var[2:]]
+        let r=[self.argbase, [s:F.incrementsub(self.subs[0], a:var[1])]+
+                    \        a:var[2:]]
     elseif a:var[0] is# 'cur'
         let r=[self.argbase, self.subs[:-1-a:var[1]]+a:var[2:]]
     elseif a:var[0] is# 'list'

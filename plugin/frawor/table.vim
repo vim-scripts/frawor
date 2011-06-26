@@ -14,14 +14,19 @@ else
         let chars=split(a:str, '\v.@=')
         let col=get(a:000, 0, 0)
         let curcol=col
+        let notranstab=!(&list && stridx(&lcs, 'tab:')==-1)
         for char in chars
-            if char[0] is# "\t"
+            if char[0] is# "\t" && notranstab
                 let curcol+=(&ts-curcol%&ts)
             else
-                let charnr=char2nr(char[0])
-                let curcol+=1+((0xFF00< charnr && charnr<=0xFF60) ||
-                            \  (0xFFE0<=charnr && charnr<=0xFFE6) ||
-                            \  charn==0x3000)
+                if char=~#'\v^\p$'
+                    let charnr=char2nr(char[0])
+                    let curcol+=1+((0xFF00< charnr && charnr<=0xFF60) ||
+                                \  (0xFFE0<=charnr && charnr<=0xFFE6) ||
+                                \  charn==0x3000)
+                else
+                    let curcol+=len(strtrans(char))
+                endif
             endif
         endfor
         return curcol-col
