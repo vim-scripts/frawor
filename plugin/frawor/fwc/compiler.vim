@@ -479,17 +479,22 @@ function s:compiler.getmatchstr(ldstr, exptype, ldtmp)
                     \'(sort(keys('.a:ldtmp.'))))'
     endif
 endfunction
-"▶1 setmatches      :: &self(ldstr, exptype)
-function s:compiler.setmatches(ldstr, exptype)
+"▶1 setmatches      :: &self(ldstr, exptype, filter)
+function s:compiler.setmatches(ldstr, exptype, filter)
     if self.joinlists
-        call add(self.ldstrs, [a:ldstr, a:exptype])
+        call add(self.ldstrs, [a:ldstr, a:exptype, a:filter])
         return self
     else
         let vstr=self.vstrs[-1]
         call add(self.vstinf[vstr], ['let', a:ldstr])
         call filter(self.l, '!(v:val[0] is# "let" && v:val[1] is# vstr)')
-        return self.let(vstr, self.getmatcher(self.matcher, a:ldstr,
-                    \                         self.comparg, 1))
+        if a:filter
+            return self.let(vstr, self.getmatcher(self.matcher, a:ldstr,
+                        \                         self.comparg, 1))
+        else
+            return self.let(vstr, self.getmatchstr(a:ldstr, a:exptype,
+                        \                          self.getlvarid('curld')))
+        endif
     endif
 endfunction
 "▶1 newvstr         :: idx + self → varname + self
@@ -517,7 +522,7 @@ function s:compiler.addjoinedmtchs()
         let curldbase=self.getlvarid('curld').'_'
         let lststrs=map(remove(self.ldstrs, 0, -1),
                     \   'self.getmatchstr(v:val[0], v:val[1], curldbase.v:key)')
-        call self.setmatches(join(lststrs, '+'), type([]))
+        call self.setmatches(join(lststrs, '+'), type([]), 1)
     endif
     return self
 endfunction

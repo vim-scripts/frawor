@@ -277,12 +277,18 @@ endfunction
 function s:F.unmap(mapdescr)
     let modes=s:F.modrewrite(a:mapdescr.mode, a:mapdescr.type)
     let lhs=s:F.hsescape(a:mapdescr.lhs, a:mapdescr.sid, a:mapdescr.type)
+    let r=1
     for mode in modes
-        execute mode.'un'.(a:mapdescr.type)
-                    \ '<special>'
-                    \ ((a:mapdescr.buffer)?('<buffer>'):(''))
-                    \ lhs
+        try
+            execute mode.'un'.(a:mapdescr.type)
+                        \ '<special>'
+                        \ ((a:mapdescr.buffer)?('<buffer>'):(''))
+                        \ lhs
+        catch /\v^Vim\(un\w+\)\:E(24|31|329):/
+            let r=0
+        endtry
     endfor
+    return r
 endfunction
 "▶1 lhsfilter     :: Either lhs [lhs] → [lhs]
 function s:F.lhsfilter(llhs)

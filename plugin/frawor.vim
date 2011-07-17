@@ -682,7 +682,6 @@ function s:F.loadplugin(plid)
                     call s:_f.throw('reqfailed', dplid, plid)
                 endif
             endfor
-            "▲2
             "▶2 Running features
             for feature in s:F.getfeatures(plugdict, s:features)
                 call s:F.addfeature(plugdict, feature, 1)

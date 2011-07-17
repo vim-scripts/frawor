@@ -1,6 +1,6 @@
 "▶1 Header
 scriptencoding utf-8
-execute frawor#Setup('0.1', {'@/resources': '0.0',
+execute frawor#Setup('0.2', {'@/resources': '0.0',
             \                '@/os':        '0.0',
             \                '@/signs':     '0.0',}, 1)
 let s:r={}
@@ -13,18 +13,19 @@ let s:strfuncregstr='''\v^%([sla]@!\w:%(\w|\.)+|%(\V<SNR>\v|s@!\w:)?\w+)$'''
 "▶1 Path
 "▶2 getfiles
 function s:F.getfiles(arglead, filter, forcefilter)
-    let fragments=s:_r.os.path.split(a:arglead)
+    let path=expand(escape(a:arglead, '\[]*?'))
+    let fragments=s:_r.os.path.split(path)
     let globstart=''
-    if a:arglead[0] is# s:_r.os.sep
+    if path[0] is# s:_r.os.sep
         let globstart=s:_r.os.sep
     endif
-    if a:arglead[-1:] is# s:_r.os.sep && get(fragments, -1, 0) isnot# ''
+    if path[-1:] is# s:_r.os.sep && get(fragments, -1, 0) isnot# ''
         call add(fragments, '')
     endif
     while len(fragments)>1 && (fragments[0] is# '.' || fragments[0] is# '..')
         let globstart.=remove(fragments, 0).s:_r.os.sep
     endwhile
-    let startswithdot = a:arglead[0] is# '.'
+    let startswithdot = path[0] is# '.'
     if empty(fragments)
         call add(fragments, '')
     endif
@@ -409,9 +410,10 @@ function s:r.run.complete(desc, idx, type)
                     \                      '"index(v:val, '.(ldescr-1).')!=-1 '.
                     \                      '|| (v:val[0]==-1 && '.
                     \                          'v:val[-1]<='.(ldescr).')")))',
-                    \          type([]))
+                    \          type([]), 1)
     endif
-    return self.setmatches('map('.getuserfunctionsstr.', "v:val[0]")', type([]))
+    return self.setmatches('map('.getuserfunctionsstr.', "v:val[0]")', type([]),
+                \          1)
 endfunction
 "▶1 `earg'
 " Replaces {argument} with the result of evaluating itself
@@ -715,7 +717,7 @@ function s:r.in.pipe(desc, idx, type, ...)
     endif
 endfunction
 function s:r.in.complete(desc, idx, type)
-    return self.setmatches(self.getvar(a:desc[1]), type([]))
+    return self.setmatches(self.getvar(a:desc[1]), type([]), 1)
 endfunction
 "▶1 `key'
 let s:r.key={'args': ['var', '?omtchr']}
@@ -732,7 +734,7 @@ function s:r.key.pipe(...)
     return call(s:r.in.pipe, a:000+['key'], self)
 endfunction
 function s:r.key.complete(desc, idx, type)
-    return self.setmatches(self.getvar(a:desc[1]), type({}))
+    return self.setmatches(self.getvar(a:desc[1]), type({}), 1)
 endfunction
 "▶1 `take'
 " Replaces {argument} with value of the first key from {var}::Dictionary that 
@@ -864,13 +866,13 @@ function s:r.idof.complete(desc, idx, type)
     if has_key(s:idofcompletes, spec)
         let getvariantsstr=self.getfunstatvar('completers', s:F['get'.spec.'s'],
                     \                         spec.'s').'()'
-        return self.setmatches(getvariantsstr, type([]))
+        return self.setmatches(getvariantsstr, type([]), 1)
     elseif spec is# 'command'
         let intcmdsstr=self.getfunstatvar('completers', s:F.getinternalcommands,
                     \                     'commands').'()'
         let usercmdsstr=self.getfunstatvar('completers', s:F.getusercommands,
                     \                      'ucommands').'()'
-        return self.setmatches(intcmdsstr.'+'.usercmdsstr, type([]))
+        return self.setmatches(intcmdsstr.'+'.usercmdsstr, type([]), 1)
     elseif spec is# 'function'
         let userfunctionsstr='map('.self.getfunstatvar('completers',
                     \                                  s:F.getuserfunctions,
@@ -879,13 +881,13 @@ function s:r.idof.complete(desc, idx, type)
         let intfuncsstr='keys('.self.getfunstatvar('completers',
                     \                              s:F.getinternalfunctions,
                     \                              'vimfunctions').'())'
-        return self.setmatches(userfunctionsstr.'+'.intfuncsstr, type([]))
+        return self.setmatches(userfunctionsstr.'+'.intfuncsstr, type([]), 1)
     elseif spec is# 'option'
         let intoptsstr='map('.self.getfunstatvar('completers', s:F.getoptions,
                     \                            'options').'(), "v:val[0]")'
-        return self.setmatches(intoptsstr, type([]))
+        return self.setmatches(intoptsstr, type([]), 1)
     elseif spec is# 'variable'
-        return self.setmatches(s:varsstr, type([]))
+        return self.setmatches(s:varsstr, type([]), 1)
     endif
 endfunction
 "▲2
@@ -1090,6 +1092,12 @@ function s:r.path.check(desc, idx, type)
     endif
     return self
 endfunction
+"▶2 pipe
+function s:r.path.pipe(...)
+    let curargstr=self.argstr()
+    call self.let(curargstr, 'expand(escape('.curargstr.', "\\[]?*"))')
+    return call(s:r.path.check, a:000, self)
+endfunction
 "▶2 complete
 function s:r.path.complete(desc, idx, type)
     let spec=a:desc[1]
@@ -1152,7 +1160,8 @@ function s:r.path.complete(desc, idx, type)
     endif
     let getfilesstr=self.getfunstatvar('completers', s:F.getfiles, 'path')
     return self.setmatches(getfilesstr.'('.self.comparg.', '.
-                \                          self.string(filter).', 1)', type([]))
+                \                          self.string(filter).', 1)', type([]),
+                \          0)
 endfunction
 "▶1 `type'
 " Checks whether {argument} has one of given types
@@ -1403,7 +1412,9 @@ let s:smartfilters=[
             \'v:val=~?reg2',
             \]
 function s:r.smart.matcher(ld, str, acceptfirst)
-    if type(a:ld)==type({})
+    if empty(a:ld)
+        return []
+    elseif type(a:ld)==type({})
         if has_key(a:ld, a:str)
             return ((a:acceptfirst is 2)?([a:str]):(a:str))
         endif

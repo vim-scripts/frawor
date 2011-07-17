@@ -1382,5 +1382,6 @@ mapping :: {}                                               *frawor-t-mapping*
     0.1: Posted strdisplaywidth function
 @/fwc:
     0.1: (intfuncs-0.1) Added `idof' checker
+    0.2: (intfuncs-0.2) Made `path' filter expand argument
 
 vim: ft=help:tw=78

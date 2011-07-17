@@ -580,6 +580,10 @@ match {reg}   (|FWC-{reg}|)                                      *FWC-c-match*
 path {pathspec}                                                   *FWC-c-path*
     Checker: checks whether current argument is a path matching given 
              specification.
+    Filter: before checking expands path without globbing (uses |expand()| 
+            with \, [, ], ? and * escaped). This means that you can use 
+            ~ directory shortcut, |:_%|, |:_#|, enviroment variables, 
+            |`-expansion| and |`=|.
                     {pathspec} :: [df]? "r"? [wWp]? "x"?
                                 & ! ( "d" | ^ ) "r"
                                 & ! "d" [wWp]? "x"
