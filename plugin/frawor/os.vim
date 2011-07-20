@@ -62,6 +62,7 @@ function s:os.path.relpath(path, ...)
     let tcomponents=s:os.path.split(s:os.path.abspath(
                 \                               (a:0)?(s:os.path.normpath(a:1)):
                 \                                     ('.')))
+    call map([components, tcomponents], 'empty(v:val[-1])?remove(v:val, -1):0')
     if components[0] isnot# tcomponents[0]
         " This is valid for windows: you can't construct a relative path if 
         " directory to which path should be relative is on another drive
@@ -72,7 +73,7 @@ function s:os.path.relpath(path, ...)
     while i<l && components[i] is# tcomponents[i]
         let i+=1
     endwhile
-    return s:os.path.join(repeat([".."], len(tcomponents)-i)+components[(i):])
+    return s:os.path.join(repeat(['..'], len(tcomponents)-i)+components[(i):])
 endfunction
 "▶3 os.path.basename  :: path → component
 function s:os.path.basename(path)
@@ -94,7 +95,7 @@ function s:os.path.join(...)
     let components=copy((a:0 && type(a:1)==type([]))?
                 \           (a:1):
                 \           (a:000))
-    call filter(components, 'type(v:val)=='.type(""))
+    call filter(components, 'type(v:val)=='.type(''))
     return substitute(join(components, s:os.sep), s:eps.'\+',
                 \     escape(s:os.sep, '\&~'), 'g')
 endfunction
