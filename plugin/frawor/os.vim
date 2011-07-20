@@ -42,7 +42,7 @@ endif
 let s:os.path={}
 "▶3 os.path.abspath   :: path + FS → path
 function s:os.path.abspath(path)
-    let components=s:os.path.split(a:path)
+    let components=s:os.path.split(expand(fnameescape(a:path)))
     if components[0] is# '.'
         let components[:0]=[fnamemodify('.', ':p')]
         if len(components[0])>1
@@ -103,7 +103,7 @@ endfunction
 function s:os.path.split(path)
     let r=[]
     let path=a:path
-    let oldpath=''
+    let oldpath=0
     while oldpath isnot# path
         call insert(r, s:os.path.basename(path))
         let oldpath=path
