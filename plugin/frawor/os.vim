@@ -1,6 +1,6 @@
 "▶1 Header
 scriptencoding utf-8
-execute frawor#Setup('0.0', {'@/resources': '0.0'}, 1)
+execute frawor#Setup('0.1', {'@/resources': '0.0'}, 1)
 "▶1 os resource
 let s:os={}
 "▶2 os.fullname
@@ -42,13 +42,37 @@ endif
 let s:os.path={}
 "▶3 os.path.abspath   :: path + FS → path
 function s:os.path.abspath(path)
-    let path=fnamemodify(a:path, ':p')
-    " Purge trailing path separator
-    return ((isdirectory(path) && len(path)>1)?(path[:-2]):(path))
+    let components=s:os.path.split(a:path)
+    if components[0] is# '.'
+        let components[:0]=[fnamemodify('.', ':p')]
+        if len(components[0])>1
+            let components[0]=components[0][:-2]
+        endif
+    endif
+    return s:os.path.join(components)
 endfunction
 "▶3 os.path.realpath  :: path + FS → path
 function s:os.path.realpath(path)
     return resolve(s:os.path.abspath(a:path))
+endfunction
+"▶3 os.path.relpath   :: path[, curdir] → path
+function s:os.path.relpath(path, ...)
+    let components=s:os.path.split(s:os.path.abspath(
+                \                                   s:os.path.normpath(a:path)))
+    let tcomponents=s:os.path.split(s:os.path.abspath(
+                \                               (a:0)?(s:os.path.normpath(a:1)):
+                \                                     ('.')))
+    if components[0] isnot# tcomponents[0]
+        " This is valid for windows: you can't construct a relative path if 
+        " directory to which path should be relative is on another drive
+        return 0
+    endif
+    let l=min([len(components), len(tcomponents)])
+    let i=1
+    while i<l && components[i] is# tcomponents[i]
+        let i+=1
+    endwhile
+    return s:os.path.join(repeat([".."], len(tcomponents)-i)+components[(i):])
 endfunction
 "▶3 os.path.basename  :: path → component
 function s:os.path.basename(path)
@@ -92,7 +116,7 @@ function s:os.path.split(path)
 endfunction
 "▶3 os.path.normpath  :: path → path
 function s:os.path.normpath(path)
-    return s:os.path.join(s:os.path.split(a:path))
+    return simplify(s:os.path.join(s:os.path.split(a:path)))
 endfunction
 "▶3 os.path.samefile  :: path, path + FS → Bool
 function s:os.path.samefile(path1, path2)

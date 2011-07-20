@@ -577,7 +577,7 @@ match {reg}   (|FWC-{reg}|)                                      *FWC-c-match*
              Matching is done case-sensitively by default.
     Completer: ignored.
 
-path {pathspec}                                                   *FWC-c-path*
+path {pathspec}                                      *FWC-c-path* *FWC-f-path*
     Checker: checks whether current argument is a path matching given 
              specification.
     Filter: before checking expands path without globbing (uses |expand()| 
