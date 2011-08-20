@@ -398,7 +398,7 @@ fwc.del : function ({FWCid})                                *frawor-f-fwc.del*
 ------------------------------------------------------------------------------
 3.8. plugin/frawor/mappings features                *frawor-f-frawor/mappings*
 
-                                                        *frawor-f-addmapgroup*
+                                                       *frawor-f-mapgroup.add*
 mapgroup.add : function ({mgid}, {mappings}[, {mgopts}])
              + unload
         Add mapping group with id {mgid}. {mappings} is a dictionary which 
@@ -1006,7 +1006,7 @@ All frawor options are defined into various modules.
 These options are defined in plugin/frawor/mappings. Unlike other frawor 
 options the following options should be prefixed with `frawormap' string, not 
 with `frawor'. Exact values of {mgid} and {mapname} are determined by plugin 
-that defined a mapping group (see |frawor-f-addmapgroup|), frawor itself does 
+that defined a mapping group (see |frawor-f-mapgroup.add|), frawor itself does 
 not define any mappings.
 
                                          *b:frawormap_mgid* *g:frawormap_mgid*
@@ -1178,6 +1178,7 @@ altervars :: [({varname}[, {value}])]                     *frawor-t-altervars*
                    tabpage or window-local variables).
         buffer     Saves and restores current buffer number.
         window     Saves and restores current tab page and window.
+        folds      Saves and restores folds state.
         winview    Saves and restores window view (using |winsaveview()| and 
                    |winrestview()|).
         matches    Saves and restores matches (using |getmatches()| and 
@@ -1391,8 +1392,11 @@ changes.
 @/fwc:
     0.1: (intfuncs-0.1) Added |FWC-c-idof|
     0.2: (intfuncs-0.2) Made |FWC-f-path| filter expand argument
+    0.3: (intfuncs-0.3) Added -onlystrings support for |FWC-c-range|
 @/os:
     0.1: Added |frawor-r-os.path.relpath|
          Made |frawor-r-os.path.normpath| also simplify its argument
+@/decorators/altervars:
+    0.1: Added folds |frawor-av-special|
 
 vim: ft=help:tw=78

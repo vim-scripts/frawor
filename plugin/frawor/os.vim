@@ -57,11 +57,10 @@ function s:os.path.realpath(path)
 endfunction
 "▶3 os.path.relpath   :: path[, curdir] → path
 function s:os.path.relpath(path, ...)
-    let components=s:os.path.split(s:os.path.abspath(
-                \                                   s:os.path.normpath(a:path)))
-    let tcomponents=s:os.path.split(s:os.path.abspath(
-                \                               (a:0)?(s:os.path.normpath(a:1)):
-                \                                     ('.')))
+    let components=s:os.path.split(s:os.path.normpath(
+                \                                    s:os.path.abspath(a:path)))
+    let tcomponents=s:os.path.split(s:os.path.normpath(
+                \                         s:os.path.abspath((a:0)?(a:1):('.'))))
     call map([components, tcomponents], 'empty(v:val[-1])?remove(v:val, -1):0')
     if components[0] isnot# tcomponents[0]
         " This is valid for windows: you can't construct a relative path if 
@@ -73,7 +72,11 @@ function s:os.path.relpath(path, ...)
     while i<l && components[i] is# tcomponents[i]
         let i+=1
     endwhile
-    return s:os.path.join(repeat(['..'], len(tcomponents)-i)+components[(i):])
+    let r=s:os.path.join(repeat(['..'], len(tcomponents)-i)+components[(i):])
+    if empty(r)
+        let r='.'
+    endif
+    return r
 endfunction
 "▶3 os.path.basename  :: path → component
 function s:os.path.basename(path)
