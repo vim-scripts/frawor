@@ -246,7 +246,7 @@ let s:sep=fnamemodify(expand('<sfile>:h'), ':p')[-1:]
 function s:F.normpath(path)
     return expand(fnameescape(substitute(resolve(a:path),
                 \                        '\V'.escape(s:sep, '\').'\+',
-                \                        escape(s:sep, '\&~'), 'g')))
+                \                        escape(s:sep, '\&~'), 'g')), 1)
 endfunction
 "▶1 parseplugpath   :: filename + FS → (plugtype, plid, runtimepath)
 let s:rtpcache={}

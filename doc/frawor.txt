@@ -823,7 +823,8 @@ os.path.relpath  :: path[, path] -> path              *frawor-os.path.relpath*
         (for example, if paths are on different drives on windows).
 os.path.normpath :: path -> path                   *frawor-r-os.path.normpath*
         Normalize path by removing duplicate path separators and simplifying 
-        it (see |simplify()|).
+        it (see |simplify()|). It also adds leading `./' to the relative 
+        paths.
 os.path.basename :: path -> component              *frawor-r-os.path.basename*
         Returns the final component of a path.
 os.path.dirname :: path -> path                     *frawor-r-os.path.dirname*

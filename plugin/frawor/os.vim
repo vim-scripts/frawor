@@ -42,7 +42,7 @@ endif
 let s:os.path={}
 "▶3 os.path.abspath   :: path + FS → path
 function s:os.path.abspath(path)
-    let components=s:os.path.split(expand(fnameescape(a:path)))
+    let components=s:os.path.split(expand(fnameescape(a:path), 1))
     if components[0] is# '.'
         let components[:0]=[fnamemodify('.', ':p')]
         if len(components[0])>1
@@ -129,7 +129,7 @@ function s:os.path.samefile(path1, path2)
 endfunction
 "▶3 os.path.exists    :: path + FS → Bool
 function s:os.path.exists(path)
-    return !empty(glob(fnameescape(a:path)))
+    return !empty(glob(fnameescape(a:path), 1))
 endfunction
 "▶3 os.path.isdir     :: path + FS → Bool
 function s:os.path.isdir(path)
@@ -153,7 +153,7 @@ endfunction
 "▶3 s:F.globdir
 function s:F.globdir(directory, ...)
     let r=split(glob(fnameescape(a:directory.s:os.sep).
-               \     get(a:000, 0, '*')),
+               \     get(a:000, 0, '*'), 1),
                \"\n", 1)
     return ((len(r)==1 && empty(r[0]))?([]):(r))
 endfunction
@@ -196,7 +196,10 @@ endfunction
 function s:os.chdir(path, ...)
     if s:os.path.isdir(a:path)
         try
-            execute ((a:0 && a:1)?('lcd'):('cd')) fnameescape(a:path)
+            " Normpath is needed because paths like `directory/' (without 
+            " preceding `/', `.' or `..') are subject to searching in &cdpath
+            execute ((a:0 && a:1)?('lcd'):('cd'))
+                        \ fnameescape(s:os.path.normpath(a:path))
             return 1
         catch
             return 0

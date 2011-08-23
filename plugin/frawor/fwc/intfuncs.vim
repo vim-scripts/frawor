@@ -13,7 +13,7 @@ let s:strfuncregstr='''\v^%([sla]@!\w:%(\w|\.)+|%(\V<SNR>\v|s@!\w:)?\w+)$'''
 "▶1 Path
 "▶2 getfiles
 function s:F.getfiles(arglead, filter, forcefilter)
-    let path=expand(escape(a:arglead, '\[]*?'))
+    let path=expand(escape(a:arglead, '\[]*?'), 1)
     let fragments=s:_r.os.path.split(path)
     let globstart=''
     if path[0] is# s:_r.os.sep
@@ -1157,7 +1157,7 @@ endfunction
 "▶2 pipe
 function s:r.path.pipe(...)
     let curargstr=self.argstr()
-    call self.let(curargstr, 'expand(escape('.curargstr.', "\\[]?*"))')
+    call self.let(curargstr, 'expand(escape('.curargstr.', "\\[]?*"), 1)')
     return call(s:r.path.check, a:000, self)
 endfunction
 "▶2 complete
