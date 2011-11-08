@@ -42,7 +42,10 @@ endif
 let s:os.path={}
 "▶3 os.path.abspath   :: path + FS → path
 function s:os.path.abspath(path)
-    let components=s:os.path.split(expand(fnameescape(a:path), 1))
+    let components=s:os.path.split(fnamemodify(a:path, ':p'))
+    if empty(components[-1])
+        call remove(components, -1)
+    endif
     if components[0] is# '.'
         let components[:0]=[fnamemodify('.', ':p')]
         if len(components[0])>1
@@ -128,9 +131,20 @@ function s:os.path.samefile(path1, path2)
                 \s:os.path.normpath(s:os.path.realpath(a:path2)))
 endfunction
 "▶3 os.path.exists    :: path + FS → Bool
-function s:os.path.exists(path)
-    return !empty(glob(fnameescape(a:path), 1))
-endfunction
+if s:os.name is# 'nt'
+    function s:os.path.exists(path)
+        " Path cannot contain these symbols, but glob('\*') will list files
+        " Same for «"<>|», but those are not special to glob()
+        if a:path=~#'[*?]'
+            return 0
+        endif
+        return !empty(glob(fnameescape(a:path), 1))
+    endfunction
+else
+    function s:os.path.exists(path)
+        return !empty(glob(fnameescape(a:path), 1))
+    endfunction
+endif
 "▶3 os.path.isdir     :: path + FS → Bool
 function s:os.path.isdir(path)
     return isdirectory(s:os.path.abspath(a:path))
