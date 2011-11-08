@@ -56,25 +56,39 @@ function s:r.optional.compile(adescr, idx, caidxstr, largsstr, purgemax, type,
         else
             " XXX This implementation does not cover all cases. I won't fix this 
             " because it is too complicated.
-            let failstr=self.getlvarid('fail')
-            call self.let(failstr, 1)
-            let i=0
             if hasnext
+                let failstr=self.getlvarid('fail')
+                call self.let(failstr, 0)
+                let oldcaidxstr=self.getlvarid('oldcaidxstr')
+                let newcaidxstr=self.getlvarid('newcaidxstr')
+                call self.let(oldcaidxstr, a:caidxstr)
+                call self.increment(a:largsstr, -1)
+                let self.failstr=failstr
+                let i=0
                 for opt in a:adescr.optional
-                    call self.if(failstr)
+                    if i>0
+                        call self.if(failstr)
+                    endif
                     call        self.try()
                     call         self.pushms('throwignore')
                     call         self.compadescr(opt, a:idx.'.'.i.'(optional)',
                                     \            'check', 1)
                     call        self.popms()
-                    call            self.let(failstr, 0)
                     call            self.let(a:caidxstr, self.getlastsub())
                     call        self.catch(s:cfreg)
-                    call    self.endif()
+                    call            self.let(failstr, 1)
+                    call        self.up()
+                    if i>0
+                        call    self.endif()
+                    endif
                     let self.subs[-1]=[a:caidxstr]
                     let i+=1
                 endfor
+                unlet self.failstr
+                call self.increment(a:largsstr, 1)
                 call self.if(failstr)
+                call    self.let(newcaidxstr, a:caidxstr)
+                call    self.let(a:caidxstr, oldcaidxstr)
             endif
             let i=0
             for opt in a:adescr.optional
@@ -86,6 +100,7 @@ function s:r.optional.compile(adescr, idx, caidxstr, largsstr, purgemax, type,
                 let i+=1
             endfor
             if hasnext
+                call    self.let(a:caidxstr, newcaidxstr)
                 call self.endif()
             endif
             return [[a:caidxstr], a:addedsavemsgs]
@@ -116,7 +131,10 @@ function s:r.optional.compile(adescr, idx, caidxstr, largsstr, purgemax, type,
         call self.let(a:caidxstr, newsub)
     endif
     call self.catch(s:cfreg)
-    if lopt==1 && has_key(a:adescr.optional[0], 'arg')
+    if has_key(self, 'failstr')
+        call self.let(self.failstr, 1)
+    endif
+    if lopt==1 && has_key(a:adescr.optional[0], 'arg') && a:type is# 'pipe'
         let defaults=reverse(map(filter(copy(a:adescr.optional[0].arg),
                     \                   'exists("v:val[0][0]") && '.
                     \                   'v:val[0][0] is# "defval"'),
@@ -392,6 +410,7 @@ function s:r.prefixes.compile(adescr, idx, caidxstr, largsstr, purgemax, type,
                 call self.addif(idxdiffstr.'=='.i)
                 call        self.compilearg(args[i-1], idx.self.string(prefix),
                             \            a:type)
+                call        self.increment(a:caidxstr, idxdiffstr)
                 call        self.break()
                 call self.up()
             endfor
@@ -503,7 +522,7 @@ function s:r.next.compile(adescr, idx, caidxstr, largsstr, purgemax, type,
     let addedsavemsgs=a:addedsavemsgs
     let hasnext=s:F.hasnext(a:adescr, 'next')
     if a:type is# 'complete'
-        let condition=a:largsstr.'>='.self.getlastsub()
+        let condition=a:largsstr.'>'.self.getlastsub()
         if self.onlyfirst
             let condition=a:largsstr.'-1 == '.self.getlastsub()
         endif

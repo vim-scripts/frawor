@@ -60,12 +60,12 @@ function s:F.printstr(len, str, col, align, hl)
     endif
     return width+spacenum
 endfunction
-"▶1 printtline       :: cols, aligns, seps, lengths, hlgroups, colnum → + :echo
-function s:F.printtline(columns, aligns, vseparators, lengths, hlgroups, colnum)
+"▶1 printtline       :: cols, aligns, seps, widths, hlgroups, colnum → + :echo
+function s:F.printtline(columns, aligns, vseparators, widths, hlgroups, colnum)
     let i=0
     let col=0
     while i<a:colnum
-        let col+=s:F.printstr(get(a:lengths, i, 0), get(a:columns, i, ''), col,
+        let col+=s:F.printstr(get(a:widths, i, 0), get(a:columns, i, ''), col,
                     \         get(a:aligns, i, 'left'), get(a:hlgroups, i, 0))
         let [separator, sephl]=get(a:vseparators, i, ['  ', 0])
         let col+=s:F.printstr(1, separator, col, 'center', sephl)
@@ -86,17 +86,22 @@ function s:F.printtable(lines, ...)
         let vseparators=[]
     endif
     call map(vseparators, 'type(v:val)=='.type('').'?[v:val, 0]:v:val')
-    let lengths=[]
+    let widths=[]
     let i=0
-    let col=0
+    let lwidth=0
     while i<colnum
-        call add(lengths, max(map(copy(lineswh),
-                    \   '(i<len(v:val))?s:F.strdisplaywidth(v:val[i], col):0')))
-        let col+=lengths[-1]
-        let col+=s:F.strdisplaywidth(get(vseparators, i, ['  ', 0])[0], col)
+        call add(widths, max(map(copy(lineswh),
+                    \'(i<len(v:val))?s:F.strdisplaywidth(v:val[i], lwidth):0')))
+        let lwidth+=widths[-1]
         let i+=1
+        if i<colnum
+            let lwidth+=s:F.strdisplaywidth(get(vseparators, i, ['  ', 0])[0],
+                        \                   lwidth)
+        endif
     endwhile
-    " TODO split columns
+    " if lwidth>&columns
+        " " TODO split columns
+    " endif
     if has_key(opts, 'header')
         if has_key(opts, 'halign')
             let haligns=repeat([opts.halign], colnum)
@@ -108,7 +113,7 @@ function s:F.printtable(lines, ...)
         echo ''
         execute 'echohl' get(opts, 'hhl', 'PreProc')
         let hvseparators=map(copy(vseparators), '[v:val[0], 0]')
-        call s:F.printtline(opts.header, haligns, hvseparators, lengths,
+        call s:F.printtline(opts.header, haligns, hvseparators, widths,
                     \       get(opts, 'hhls', []), colnum)
         echohl NONE
     endif
@@ -124,7 +129,7 @@ function s:F.printtable(lines, ...)
     endif
     for line in a:lines
         echo ''
-        call s:F.printtline(line, aligns, vseparators, lengths,
+        call s:F.printtline(line, aligns, vseparators, widths,
                     \       get(opts, 'hls', []), colnum)
     endfor
     if has_key(opts, 'hl')

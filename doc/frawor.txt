@@ -1394,6 +1394,8 @@ changes.
     0.1: (intfuncs-0.1) Added |FWC-c-idof|
     0.2: (intfuncs-0.2) Made |FWC-f-path| filter expand argument
     0.3: (intfuncs-0.3) Added -onlystrings support for |FWC-c-range|
+    0.4: (intfuncs-0.4) Made |FWC-f-isfunc| transform argument to a function 
+                        reference
 @/os:
     0.1: Added |frawor-r-os.path.relpath|
          Made |frawor-r-os.path.normpath| also simplify its argument

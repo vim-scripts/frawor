@@ -1,6 +1,6 @@
 "▶1 Header
 scriptencoding utf-8
-execute frawor#Setup('0.3', {'@/resources': '0.0',
+execute frawor#Setup('0.4', {'@/resources': '0.0',
             \                '@/os':        '0.0',
             \                '@/signs':     '0.0',}, 1)
 let s:r={}
@@ -1305,6 +1305,20 @@ function s:r.isfunc.check(desc, idx, type)
                     \            '&& '.curargstr.'=~#'.s:strfuncregstr.
                     \            '&& exists("*".'.curargstr.')))',
                     \       'nsfunc', a:idx, 'string('.curargstr.')')
+    endif
+    return self
+endfunction
+function s:r.isfunc.pipe(desc, idx, type)
+    call call(s:r.isfunc.check, [a:desc, a:idx, a:type], self)
+    if !a:desc[1]
+        let curargstr=self.argstr()
+        call self.let(curargstr,
+                    \ '((type('.curargstr.')==2)?'.
+                    \   '('.curargstr.'):'.
+                    \ '((exists('.curargstr.'))?'.
+                    \    '(eval('.curargstr.'))'.
+                    \  ':'.
+                    \    '(function('.curargstr.'))))')
     endif
     return self
 endfunction

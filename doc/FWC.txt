@@ -620,13 +620,15 @@ type {typespec}*                                                  *FWC-c-type*
     You can't check for floating-point values if vim is compiled without 
     |+float| feature.
 
-isfunc {one}   (|FWC-{one}|)                                    *FWC-c-isfunc*
+isfunc {one}   (|FWC-{one}|)                     *FWC-f-isfunc* *FWC-c-isfunc*
     Checker: checks whether argument is a name of a callable function or 
              a callable function reference. If optional argument is 1, then 
              only function references are allowed.
              Names of dictionary items are also allowed, but only if they 
              start with scope prefix and do use only dotted subscripts 
              (dict.key).
+    Filter: checks argument with above rules and if check succeeds, transforms 
+            it into a function reference (unless it is a reference already).
 
 isreg                                                            *FWC-c-isreg*
     Checker: checks whether argument is a valid regular expression.
