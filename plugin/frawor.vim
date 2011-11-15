@@ -634,11 +634,11 @@ function s:F.loadplugin(plid)
             execute 'runtime! '.fnameescape(plid.'.vim')
         endif
         "▶3 Checking whether plugin was successfully loaded
-        if !has_key(s:pls, a:plid)
+        if !has_key(s:pls, plid)
             return 0
         endif
         "▲3
-        let plugdict=s:pls[a:plid]
+        let plugdict=s:pls[plid]
     "▶3 Processing dictionary supplied instead of plugin ID
     elseif type(a:plid)==type({})
         if has_key(a:plid, 'id') && type(a:plid.id)==type('') &&
