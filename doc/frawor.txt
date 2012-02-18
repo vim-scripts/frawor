@@ -1396,6 +1396,10 @@ changes.
     0.3: (intfuncs-0.3) Added -onlystrings support for |FWC-c-range|
     0.4: (intfuncs-0.4) Made |FWC-f-isfunc| transform argument to a function 
                         reference
+@/fwc/constructor:
+    0.1: Added more functions
+    1.0: Renamed some functions so that they now have “_” at the start of 
+         their names
 @/os:
     0.1: Added |frawor-r-os.path.relpath|
          Made |frawor-r-os.path.normpath| also simplify its argument

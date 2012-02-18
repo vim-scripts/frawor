@@ -8,35 +8,43 @@ elseif s:_pluginloaded
 endif
 let s:F.base64={}
 "▶1 and                :: UInt, UInt → UInt
-function s:F.and(v1, v2)
-    let [v1, v2]=[a:v1, a:v2]
-    let list=[]
-    while v1 || v2
-        let [nv1, nv2]=[v1/2, v2/2]
-        call add(list, ((nv1*2!=v1)&&(nv2*2!=v2)))
-        let [v1, v2]=[nv1, nv2]
-    endwhile
-    let r=0
-    while !empty(list)
-        let r=(r*2) + remove(list, -1)
-    endwhile
-    return r
-endfunction
+if exists('*and')
+    let s:F.and=function('and')
+else
+    function s:F.and(v1, v2)
+        let [v1, v2]=[a:v1, a:v2]
+        let list=[]
+        while v1 || v2
+            let [nv1, nv2]=[v1/2, v2/2]
+            call add(list, ((nv1*2!=v1)&&(nv2*2!=v2)))
+            let [v1, v2]=[nv1, nv2]
+        endwhile
+        let r=0
+        while !empty(list)
+            let r=(r*2) + remove(list, -1)
+        endwhile
+        return r
+    endfunction
+endif
 "▶1 or                 :: UInt, UInt → UInt
-function s:F.or(v1, v2)
-    let [v1, v2]=[a:v1, a:v2]
-    let list=[]
-    while v1 || v2
-        let [nv1, nv2]=[v1/2, v2/2]
-        call add(list, ((nv1*2!=v1)||(nv2*2!=v2)))
-        let [v1, v2]=[nv1, nv2]
-    endwhile
-    let r=0
-    while !empty(list)
-        let r=(r*2) + remove(list, -1)
-    endwhile
-    return r
-endfunction
+if exists('*or')
+    let s:F.or=function('or')
+else
+    function s:F.or(v1, v2)
+        let [v1, v2]=[a:v1, a:v2]
+        let list=[]
+        while v1 || v2
+            let [nv1, nv2]=[v1/2, v2/2]
+            call add(list, ((nv1*2!=v1)||(nv2*2!=v2)))
+            let [v1, v2]=[nv1, nv2]
+        endwhile
+        let r=0
+        while !empty(list)
+            let r=(r*2) + remove(list, -1)
+        endwhile
+        return r
+    endfunction
+endif
 "▶1 base64.decode      :: b64str[, bytearray::Bool] → str | bytearray
 let s:cd64=map(split('|$$$}rstuvwxyz{$$$$$$$>?@ABCDEFGHIJKLMNOPQRSTUVW$$$$$$XYZ[\]^_`abcdefghijklmnopq',
             \              '\v.@='),
