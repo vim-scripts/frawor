@@ -806,12 +806,20 @@ os.walk :: path + FS -> [(path, [ component ], [ component ])]
         subdirectories' names and {filenames} is a list of regular file names.
         Note that symbolic links to existing directories are considered to be 
         directories themselves.
-os.run :: [command[, arg1[, arg2[, ...]]]][, path]           *frawor-r-os.run*
-        Runs command with given arguments and returns its exit code. Optional 
-        path argument designates working directory in which command should be 
-        run.
+os.run :: command[, path] -> shell_error|-1                  *frawor-r-os.run*
+        Runs command with given arguments and returns its exit code. “Command” 
+        may be either a list of strings (in this case they will get 
+        |shellescaped()| and joined with spaces) or a plain string (note that 
+        you must use {special}=1 when using |shellescape()|). Optional path 
+        argument designates working directory in which command should be run. 
+        If path is not accessible it may return -1.
         Note that os.run depends on 'shell', 'shellquote', 'shellxquote' and 
         'shellcmdflag' options being set correctly.
+os.readsystem :: command[, path] -> [ String ] | -1   *frawor-r-os.readsystem*
+        Like |frawor-r-os.run|, but returns command outputs instead in the 
+        same format as |readfile()| does. Additionally depends on 'shellredir' 
+        option being set correctly and |tempname()| returning writable file 
+        name.
 os.path.abspath :: path + FS -> path                *frawor-r-os.path.abspath*
         Returns an absolute path.
 os.path.realpath :: path + FS -> path              *frawor-r-os.path.realpath*
@@ -1403,6 +1411,8 @@ changes.
 @/os:
     0.1: Added |frawor-r-os.path.relpath|
          Made |frawor-r-os.path.normpath| also simplify its argument
+    0.2: Added |frawor-r-os.readsystem|, made |frawor-r-os.run| also accept 
+         plain strings as the first argument
 @/decorators/altervars:
     0.1: Added folds |frawor-av-special|
 
