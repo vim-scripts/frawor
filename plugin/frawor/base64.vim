@@ -183,5 +183,5 @@ endfunction
 "▶1 post resource
 call s:_f.postresource('base64', s:F.base64)
 "▶1
-call frawor#Lockvar(s:, '_pluginloaded')
+call frawor#Lockvar(s:, '')
 " vim: fmr=▶,▲ sw=4 ts=4 sts=4 et tw=80
