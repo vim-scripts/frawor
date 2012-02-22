@@ -347,7 +347,7 @@ function s:F.recdictmap(dict, expr, ...)
     return map(a:dict, 'type(v:val)=='.type({}).' ? '.
                 \           's:F.recdictmap(v:val, a:expr, path+[v:key], '.
                 \                          'processed) : '.
-                \           'eval(a:expr)')
+                \           '('.a:expr.')')
 endfunction
 "▶1 createconsfunc  :: efid, fname, consargs, suf → function
 function s:F.createconsfunc(efid, fname, consargs, suf)
@@ -371,23 +371,6 @@ function s:F.createcons(plugdict, shadowdict, feature)
                     \             a:shadowdict.consargs, '')
     endif
 endfunction
-"▶1 featcomp        :: feature, feature + s:deplen → -1|0|1
-function s:FeatComp(feature1, feature2)
-    let plid1=a:feature1.plid
-    let plid2=a:feature2.plid
-    let dl1=s:deplen[plid1]
-    let dl2=s:deplen[plid2]
-    if dl1==dl2
-        if plid1 is# plid2
-            return ((a:feature1.id>a:feature2.id)?(1):(-1))
-        endif
-        return ((plid1>plid2)?(1):(-1))
-    endif
-    return ((dl1<dl2)?(1):(-1))
-endfunction
-" " Can't add s:FeatComp to _functions because it is required for unloadplugin 
-" " to  work and thus should not be removed by unloadpre event
-" let function('s:FeatComp')=function('s:FeatComp')
 "▶1 addcons         :: plugdict + s:featordered.all → + p:_f
 function s:F.addcons(plugdict)
     let shadowdict=s:shadow[a:plugdict.id]
@@ -435,13 +418,18 @@ function s:F.initfeatures(plugdict)
         endif
     endfor
 endfunction
-"▶1 updatedeplen    :: plugdict + s:deplen → + s:deplen
-function s:F.updatedeplen(plugdict)
-    " XXX max([])=0
-    let s:deplen[a:plugdict.id]=max(map(keys(a:plugdict.dependencies),
-                \                       '((v:val is# a:plugdict.id)?'.
-                \                           '(0):'.
-                \                           '(get(s:deplen, v:val, 0)))'))+1
+"▶1 updatedeplen    :: plid, newval, dict + s:deplen → + s:deplen
+function s:F.updatedeplen(plid, newval, updated)
+    let s:deplen[a:plid]=a:newval
+    let a:updated[a:plid]=1
+    if has_key(s:dependents, a:plid)
+        let nv=a:newval+1
+        call map(keys(s:dependents[a:plid]),
+                    \'((!has_key(a:updated, v:val) && '.
+                    \  's:deplen[v:val]<'.nv.')?'.
+                    \   's:F.updatedeplen(v:val, '.nv.', a:updated):'.
+                    \   '0)')
+    endif
 endfunction
 "▶1 newplugin       :: version, sid, file, dependencies, oneload, g → +s:pls,
 function s:F.newplugin(version, sid, file, dependencies, oneload, g)
@@ -564,7 +552,11 @@ function s:F.newplugin(version, sid, file, dependencies, oneload, g)
     "▲2
     let s:pls[plid]=plugdict
     let s:shadow[plid]=shadowdict
-    call s:F.updatedeplen(plugdict)
+    let s:deplen[plid]=max(map(keys(plugdict.dependencies),
+                \              '((v:val is# '.string(plid).')?'.
+                \                  '(0):'.
+                \                  '(get(s:deplen, v:val, 0)))'))+1
+    call s:F.updatedeplen(plid, s:deplen[plid], {})
     call s:F.initfeatures(plugdict)
     let plugdict.g._pluginloaded=0
     if a:oneload
@@ -678,6 +670,7 @@ function s:F.loadplugin(plid)
         let plugdict.g._loading=1
         let d={}
         try
+            let olddeplen=s:deplen[plid]
             "▶2 Loading dependencies
             for [dplid, d.Version] in items(plugdict.dependencies)
                 if has_key(s:loading, dplid)
@@ -686,24 +679,28 @@ function s:F.loadplugin(plid)
                     endif
                     continue
                 endif
-                if s:F.loadplugin(dplid)
-                    let dversion=s:pls[dplid].version
-                    "▶3 Checking dependency version
-                    if d.Version[0]!=dversion[0]
-                        call s:_f.throw('majmismatch', dplid, plid,
-                                    \                  d.Version[0],
-                                    \                  dversion[0])
-                    elseif s:F.compareversions(d.Version, dversion)>0
-                        call s:_f.throw('oldversion', dplid, plid,
-                                    \                 join(d.Version, '.'),
-                                    \                 join(dversion,  '.'))
+                if !has_key(s:pls, dplid) || s:pls[dplid].status!=2
+                    if s:F.loadplugin(dplid)
+                        " It must have run updatedeplen on its own and thus has 
+                        " updated all plid dependants
+                        let olddeplen=s:deplen[plid]
+                    else
+                        call s:_f.throw('reqfailed', dplid, plid)
                     endif
-                    "▲3
-                else
-                    call s:_f.throw('reqfailed', dplid, plid)
                 endif
+                let dversion=s:pls[dplid].version
+                "▶3 Checking dependency version
+                if d.Version[0]!=dversion[0]
+                    call s:_f.throw('majmismatch', dplid, plid,
+                                \                  d.Version[0],
+                                \                  dversion[0])
+                elseif s:F.compareversions(d.Version, dversion)>0
+                    call s:_f.throw('oldversion', dplid, plid,
+                                \                 join(d.Version, '.'),
+                                \                 join(dversion,  '.'))
+                endif
+                "▲3
             endfor
-            call s:F.updatedeplen(plugdict)
             "▶2 Running features
             for feature in s:F.getfeatures(plugdict, 'all')
                 call s:F.addfeature(plugdict, feature, 1)
@@ -711,6 +708,9 @@ function s:F.loadplugin(plid)
             "▲2
             if !plugdict.oneload
                 execute 'source '.fnameescape(plugdict.file)
+            endif
+            if s:deplen[plid]>olddeplen
+                call s:F.updatedeplen(plid, s:deplen[plid], {})
             endif
             "▶2 Modifying plugdict status
             let plugdict.g._pluginloaded=1
@@ -785,10 +785,6 @@ function s:F.unloadplugin(plid)
         return []
     endif
 endfunction
-"▶1 _unload
-function s:._unload()
-    delfunction s:FeatComp
-endfunction
 "▶1 FraworRegister
 function FraworRegister(...)
     return call(s:F.newplugin, a:000, {})
@@ -812,6 +808,52 @@ function s:F.isfunc(Func, key, fname, plid)
         call s:_f.throw('ncall', a:fname, a:plid, a:key)
     elseif stridx(a:key, '.')!=-1 && a:key!~#'^cons\%(\.\w\+\)\+$'
         call s:_f.throw('invkey', a:fname, a:plid, a:key)
+    endif
+endfunction
+"▶1 featcomp        :: feature, feature + s:deplen → -1|0|1
+function s:F.featcomp(feature1, feature2)
+    let plid1=a:feature1.plid
+    let plid2=a:feature2.plid
+    let dl1=s:deplen[plid1]
+    let dl2=s:deplen[plid2]
+    if dl1==dl2
+        if plid1 is# plid2
+            return ((a:feature1.id>a:feature2.id)?(1):(-1))
+        endif
+        return ((plid1>plid2)?(1):(-1))
+    endif
+    return ((dl1<dl2)?(1):(-1))
+endfunction
+"▶1 biadd                      :: [a], a, cmp → + [a]
+function s:F.biadd(list, item, Cmp)
+    let llist=len(a:list)
+    let d={'cmp': a:Cmp}
+    if !llist
+        call add(a:list, a:item)
+    elseif llist==1
+        call call((d.cmp(a:list[0], a:item)>0)?('insert'):('add'),
+                    \[a:list, a:item])
+    else
+        if d.cmp(a:list[0], a:item)>0
+            call insert(a:list, a:item)
+            return
+        elseif d.cmp(a:list[-1], a:item)<0
+            call add(a:list, a:item)
+            return
+        endif
+        let lborder=0
+        let rborder=llist-1
+        let cur=(((rborder+1)/2)-1)
+        while lborder!=rborder
+            let cr=d.cmp(a:list[cur], a:item)
+            let shift=((rborder-lborder)/2)
+            if !shift
+                break
+            endif
+            let {(cr>0)?('r'):('l')}border=cur
+            let cur=lborder+shift
+        endwhile
+        call insert(a:list, a:item, rborder)
     endif
 endfunction
 "▶1 features.newfeature.cons   :: {f}, fid, fopts → + s:features, shadowdict, …
@@ -843,17 +885,12 @@ function s:newfeature.cons(plugdict, fdict, fid, fopts)
     "▶2 Adding keys that hold functions
     let addedsomething=0
     for key in filter(copy(s:featfunckeys), 'has_key(a:fopts, v:val)')
-        if key is# 'cons'
-            if type(a:fopts[key])==type({})
-                call s:F.recdictmap(deepcopy(a:fopts[key]),
-                            \'s:F.isfunc(v:val, '.
-                            \           '"cons.".join(path+[v:key], "."), '.
-                            \            string(feature.name).', '.
-                            \            string(feature.plid).')')
-            else
-                call s:F.isfunc(a:fopts[key], key, feature.name,
-                            \   feature.plid)
-            endif
+        if key is# 'cons' && type(a:fopts[key])==type({})
+            call s:F.recdictmap(deepcopy(a:fopts[key]),
+                        \'s:F.isfunc(v:val, '.
+                        \           '"cons.".join(path+[v:key], "."), '.
+                        \            string(feature.name).', '.
+                        \            string(feature.plid).')')
         else
             call s:F.isfunc(a:fopts[key], key, feature.name, feature.plid)
         endif
@@ -879,7 +916,8 @@ function s:newfeature.cons(plugdict, fdict, fid, fopts)
     let a:fdict[feature.name]=feature
     let s:features[feature.id]=feature
     let s:plfeatures[a:plugdict.id]=a:fdict
-    let s:featordered={'all': sort(values(s:features), function('s:FeatComp'))}
+    let s:featordered={'all': s:featordered.all}
+    call s:F.biadd(s:featordered.all, feature, s:F.featcomp)
     "▶2 Running addfeature()
     call map(((has_key(feature, 'ignoredeps'))?
                 \(values(s:pls)):
@@ -1009,6 +1047,8 @@ function s:F.require(plugdict, fdict, dplid, dversion, throw)
                 return 0
             endif
         endif
+    elseif s:deplen[dplid]+1>s:deplen[a:plugdict.id]
+        call s:F.updatedeplen(a:plugdict.id, s:deplen[dplid]+1, {})
     endif
     "▲2
     let dfeatures=get(s:plfeatures, dplid, {})
