@@ -595,9 +595,13 @@ command.add : function( cid, cstr, copts )              *frawor-f-command.add*
                      done only after plugin is loaded.
         splitfunc, rsplitfunc
                   Defines function that will split command-line into a list of 
-                  arguments. `splitfunc' is for FWC completion, `rsplitfunc' 
-                  is for running. Latter is valid only if {cstr} is not 
-                  a string. Use 0 to keep default behavior.
+                  arguments. `splitfunc' is for completion (only valid if 
+                  completion defined by a list), `rsplitfunc' is for running 
+                  (valid only if {cstr} is not a string). You may use 0 to 
+                  keep default behavior.
+        usedictcompsplitfunc
+                  If true, makes `splitfunc' key be also used for dictionary 
+                  completion definitions.
 
         Order of additional arguments if any (only applicable if {cstr} is 
         a dictionary or a function reference):
@@ -1458,5 +1462,7 @@ changes.
 @/functions:
     0.1: Added ability to have [{plid}, {version}, {key}] in 
          |frawor-fd-function| and |frawor-fd-thisplugin|.
+@/commands:
+    0.1: Added usedictcompsplitfunc option
 
 vim: ft=help:tw=78
