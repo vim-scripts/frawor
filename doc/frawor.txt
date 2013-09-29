@@ -1145,7 +1145,7 @@ option :: {}                                                 *frawor-t-option*
                     is deep copied (see |deepcopy()|). Otherwise copying is 
                     not performed.
                                                           *frawor-od-override*
-        override    Determines values from which scopes sholud override 
+        override    Determines values from which scopes should override 
                     default value. Value is the same as |frawor-od-scopes|.
                     This option is ignored unless |frawor-od-merger| is 
                     defined.
